@@ -144,6 +144,44 @@ def test_update_refuses_event_with_attendees(provider, service):
     _events(service).patch.assert_not_called()
 
 
+def _event_organized_by(organizer: dict) -> dict:
+    return {
+        "id": "5",
+        "summary": "Reunião",
+        "start": {"dateTime": "2026-11-27T12:00:00-03:00"},
+        "end": {"dateTime": "2026-11-27T13:00:00-03:00"},
+        "attendees": [{"email": "me", "self": True}],
+        "organizer": organizer,
+    }
+
+
+def test_update_and_delete_refuse_event_organized_by_someone_else(provider, service):
+    _events(service).get.return_value.execute.return_value = _event_organized_by(
+        {"email": "x", "self": False}
+    )
+
+    with pytest.raises(EventHasAttendeesError):
+        provider.update_event("5", title="Novo")
+    with pytest.raises(EventHasAttendeesError):
+        provider.delete_event("5")
+
+    _events(service).patch.assert_not_called()
+    _events(service).delete.assert_not_called()
+
+
+def test_update_allows_event_organized_by_me(provider, service):
+    _events(service).get.return_value.execute.return_value = _event_organized_by(
+        {"email": "me", "self": True}
+    )
+    _events(service).patch.return_value.execute.return_value = _event_organized_by(
+        {"email": "me", "self": True}
+    )
+
+    provider.update_event("5", title="Novo")
+
+    _events(service).patch.assert_called_once()
+
+
 def test_update_patches_only_given_fields(provider, service):
     _events(service).get.return_value.execute.return_value = {
         "id": "1",

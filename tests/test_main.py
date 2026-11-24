@@ -126,6 +126,14 @@ def test_webhook_verification_ok_and_forbidden(client):
     assert bad_mode.status_code == 403
 
 
+def test_webhook_verification_with_non_ascii_token_is_forbidden(client):
+    response = client.get(
+        "/webhook",
+        params={"hub.mode": "subscribe", "hub.verify_token": "señal", "hub.challenge": "123"},
+    )
+    assert response.status_code == 403
+
+
 def test_post_with_bad_signature_is_rejected(client, sender):
     body = json.dumps(text_payload()).encode()
     response = client.post(

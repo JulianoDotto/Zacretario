@@ -6,11 +6,14 @@ import pytest
 from zacretario.channels.whatsapp import IncomingMessage
 from zacretario.config import Settings
 from zacretario.repositories.conversation import recent_messages
-from zacretario.service import Deps, handle_message
+from zacretario.service import Deps, handle_message, resolve_owner
 
 PHONE = "5511999990000"
 NOTICE = "Por enquanto eu só entendo mensagens de texto 🙂"
-APOLOGY = "Tive um problema pra processar isso agora. Pode tentar de novo em instantes?"
+APOLOGY = (
+    "Tive um problema pra processar isso agora. Antes de mandar de novo, confere com "
+    '"o que tenho pra fazer?" se algo já foi registrado.'
+)
 
 
 class FakeSender:
@@ -149,3 +152,30 @@ def test_failing_apology_does_not_propagate(deps, sender, agent):
 
     sender.send_text = broken_send
     handle_message(make_message(), deps)
+
+
+def test_resolve_owner_exact_match():
+    assert resolve_owner("5511999990000", {"5511999990000": "juliano"}) == "juliano"
+
+
+def test_resolve_owner_sender_without_ninth_digit():
+    assert resolve_owner("551199990000", {"5511999990000": "juliano"}) == "juliano"
+
+
+def test_resolve_owner_configured_without_ninth_digit():
+    assert resolve_owner("5511999990000", {"551199990000": "juliano"}) == "juliano"
+
+
+def test_resolve_owner_does_not_fuzz_non_brazilian_numbers():
+    assert resolve_owner("14155550123", {"141555550123": "ana"}) is None
+    assert resolve_owner("441234567890", {"4412345678900": "ana"}) is None
+
+
+def test_resolve_owner_unknown_number():
+    assert resolve_owner("5521988887777", {"5511999990000": "juliano"}) is None
+
+
+def test_message_from_number_without_ninth_digit_replies_to_sender(deps, sender):
+    handle_message(make_message(sender="551199990000"), deps)
+
+    assert sender.sent == [("551199990000", "Feito!")]

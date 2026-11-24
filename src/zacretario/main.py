@@ -1,3 +1,4 @@
+import hmac
 import json
 import logging
 from datetime import UTC, datetime
@@ -31,9 +32,9 @@ def create_app(deps: Deps) -> FastAPI:
     @app.get("/webhook")
     def verify_webhook(request: Request) -> PlainTextResponse:
         params = request.query_params
-        if (
-            params.get("hub.mode") == "subscribe"
-            and params.get("hub.verify_token") == deps.settings.whatsapp_verify_token
+        if params.get("hub.mode") == "subscribe" and hmac.compare_digest(
+            params.get("hub.verify_token", "").encode(),
+            deps.settings.whatsapp_verify_token.encode(),
         ):
             return PlainTextResponse(params.get("hub.challenge", ""))
         raise HTTPException(status_code=403)

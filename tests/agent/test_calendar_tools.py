@@ -111,7 +111,7 @@ def test_delete_event_with_attendees_returns_tool_error(ctx):
         has_attendees=True,
     )
 
-    with pytest.raises(ToolError, match="convidados"):
+    with pytest.raises(ToolError, match="outros participantes"):
         run(ctx, "delete_event", event_id=event.id)
     assert event.id in ctx.calendar.events
 
@@ -218,7 +218,7 @@ def test_update_event_with_attendees_returns_tool_error(ctx):
         has_attendees=True,
     )
 
-    with pytest.raises(ToolError, match="convidados"):
+    with pytest.raises(ToolError, match="outros participantes"):
         update(ctx, event.id, date="2026-11-30")
 
 

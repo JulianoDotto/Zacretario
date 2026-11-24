@@ -16,7 +16,30 @@ from zacretario.repositories import conversation
 logger = logging.getLogger(__name__)
 
 NON_TEXT_NOTICE = "Por enquanto eu só entendo mensagens de texto 🙂"
-ERROR_MESSAGE = "Tive um problema pra processar isso agora. Pode tentar de novo em instantes?"
+ERROR_MESSAGE = (
+    "Tive um problema pra processar isso agora. Antes de mandar de novo, confere com "
+    '"o que tenho pra fazer?" se algo já foi registrado.'
+)
+
+
+def resolve_owner(sender: str, allowed_users: dict[str, str]) -> str | None:
+    """Find the owner of a sender number, tolerating Brazil's optional 9th digit.
+
+    The Cloud API often delivers Brazilian mobiles as 55 + DDD + 8 digits (12 digits)
+    while users configure 55 + DDD + 9 + 8 digits (13 digits), or the other way around.
+    """
+    if sender in allowed_users:
+        return allowed_users[sender]
+    for number, owner in allowed_users.items():
+        if _without_ninth_digit(number) == _without_ninth_digit(sender):
+            return owner
+    return None
+
+
+def _without_ninth_digit(number: str) -> str:
+    if number.startswith("55") and len(number) == 13 and number[4] == "9":
+        return number[:4] + number[5:]
+    return number
 
 
 @dataclass
@@ -33,7 +56,7 @@ class Deps:
 def handle_message(message: IncomingMessage, deps: Deps) -> None:
     """Runs in a background task, so it must never raise."""
     try:
-        owner = deps.settings.allowed_users.get(message.sender)
+        owner = resolve_owner(message.sender, deps.settings.allowed_users)
         if owner is None:
             logger.info("Ignoring message from unknown number %s", message.sender)
             return

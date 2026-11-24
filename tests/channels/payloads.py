@@ -40,6 +40,21 @@ STATUS_PAYLOAD = _wrap(
     }
 )
 
+REACTION_PAYLOAD = _wrap(
+    {
+        **_BASE,
+        "messages": [
+            {
+                "from": "5511999990000",
+                "id": "wamid.R",
+                "timestamp": "1764000003",
+                "type": "reaction",
+                "reaction": {"message_id": "wamid.X", "emoji": "👍"},
+            }
+        ],
+    }
+)
+
 AUDIO_PAYLOAD = _wrap(
     {
         **_BASE,

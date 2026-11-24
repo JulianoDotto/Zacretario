@@ -60,7 +60,8 @@ def _calendar_errors() -> Iterator[None]:
         yield
     except EventHasAttendeesError as error:
         raise ToolError(
-            "Este evento tem convidados, então não posso alterá-lo nem cancelá-lo."
+            "Este evento tem outros participantes ou foi organizado por outra pessoa, "
+            "então não posso alterá-lo nem cancelá-lo."
         ) from error
     except EventNotFoundError as error:
         raise ToolError("Evento não encontrado.") from error
@@ -196,6 +197,11 @@ def _find_free_slots(ctx: ToolContext, args: dict) -> str:
 
 # --- Registration -----------------------------------------------------------
 
+
+def _nullable(type_: str, description: str) -> dict:
+    return {"anyOf": [{"type": type_}, {"type": "null"}], "description": description}
+
+
 _DATE = "Data no formato AAAA-MM-DD."
 _TIME = "Hora no formato HH:MM."
 
@@ -221,8 +227,8 @@ register(
             {
                 "title": {"type": "string", "description": "Título do evento."},
                 "date": {"type": "string", "description": _DATE},
-                "start_time": {"type": ["string", "null"], "description": _TIME},
-                "end_time": {"type": ["string", "null"], "description": _TIME},
+                "start_time": _nullable("string", _TIME),
+                "end_time": _nullable("string", _TIME),
             }
         ),
         handler=_create_event,
@@ -252,10 +258,10 @@ register(
         input_schema=_schema(
             {
                 "event_id": {"type": "string", "description": "Id do evento."},
-                "title": {"type": ["string", "null"], "description": "Novo título."},
-                "date": {"type": ["string", "null"], "description": _DATE},
-                "start_time": {"type": ["string", "null"], "description": _TIME},
-                "end_time": {"type": ["string", "null"], "description": _TIME},
+                "title": _nullable("string", "Novo título."),
+                "date": _nullable("string", _DATE),
+                "start_time": _nullable("string", _TIME),
+                "end_time": _nullable("string", _TIME),
             }
         ),
         handler=_update_event,
@@ -284,8 +290,8 @@ register(
                 "start_date": {"type": "string", "description": _DATE},
                 "end_date": {"type": "string", "description": _DATE},
                 "duration_minutes": {"type": "integer", "description": "Duração em minutos."},
-                "earliest_time": {"type": ["string", "null"], "description": _TIME},
-                "latest_time": {"type": ["string", "null"], "description": _TIME},
+                "earliest_time": _nullable("string", _TIME),
+                "latest_time": _nullable("string", _TIME),
             }
         ),
         handler=_find_free_slots,

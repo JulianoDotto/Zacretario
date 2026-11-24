@@ -37,3 +37,9 @@ The agent takes text and returns text, and knows nothing about WhatsApp. A Teleg
 Extension point: the tool registry.
 
 Each skill is a schema plus a function registered in `src/zacretario/agent/registry.py`. Add a module under `src/zacretario/agent/` and import it in `src/zacretario/agent/__init__.py`; the agent loop is untouched.
+
+## Housekeeping and concurrency
+
+- **Pruning old rows.** `processed_messages` and `conversation_messages` only grow. A periodic job could delete deduplication rows older than a few days and conversation rows older than the history window.
+- **Per-user serialization.** Two messages from the same user sent close together run in separate background tasks and can interleave (for example, a "yes" racing the message it confirms). A per-owner lock or queue in `src/zacretario/service.py` would process them in order.
+- **Timed event back to all-day.** `update_event` can turn an all-day event into a timed one, but not the reverse. Supporting it needs a way for the tool to say "make this all-day" (for example an `all_day` flag) and a call to `_time_field` with `clear_other`.

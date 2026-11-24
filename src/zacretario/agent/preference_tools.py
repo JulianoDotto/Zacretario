@@ -60,16 +60,18 @@ register(
             "type": "object",
             "properties": {
                 "day_start": {
-                    "type": ["string", "null"],
+                    "anyOf": [{"type": "string"}, {"type": "null"}],
                     "description": "Início do dia no formato HH:MM.",
                 },
                 "day_end": {
-                    "type": ["string", "null"],
+                    "anyOf": [{"type": "string"}, {"type": "null"}],
                     "description": "Fim do dia no formato HH:MM.",
                 },
                 "blocked_weekdays": {
-                    "type": ["array", "null"],
-                    "items": {"type": "integer"},
+                    "anyOf": [
+                        {"type": "array", "items": {"type": "integer"}},
+                        {"type": "null"},
+                    ],
                     "description": "Dias bloqueados (0=segunda a 6=domingo); [] libera.",
                 },
             },

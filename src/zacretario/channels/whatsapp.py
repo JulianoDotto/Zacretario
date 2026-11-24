@@ -5,6 +5,9 @@ from typing import Protocol
 
 import httpx
 
+# Reactions and system notices are not requests, so they must not get a reply.
+IGNORED_TYPES = {"reaction", "system"}
+
 _default_http = httpx.Client(timeout=10)
 
 
@@ -34,6 +37,8 @@ def parse_webhook(payload: dict) -> list[IncomingMessage]:
                 if not message_id or not sender:
                     continue
                 kind = msg.get("type") or "unknown"
+                if kind in IGNORED_TYPES:
+                    continue
                 text = (msg.get("text") or {}).get("body") if kind == "text" else None
                 result.append(IncomingMessage(message_id, sender, kind, text))
     return result

@@ -46,4 +46,6 @@ def test_registry_api_params_are_strict():
     for item in params:
         assert item["strict"] is True
         assert item["input_schema"]["additionalProperties"] is False
+        for prop in item["input_schema"]["properties"].values():
+            assert not isinstance(prop.get("type"), list)
         assert set(item["input_schema"]["required"]) == set(item["input_schema"]["properties"])

@@ -11,8 +11,8 @@ The bot works in pt-BR; translations are in parentheses.
 ```
 Ana:  Dentista, quinta-feira, 10h da manhã
       (Dentist, Thursday, 10 a.m.)
-Bot:  📅 Dentista: qui 27/11, 10h–11h
-      (📅 Dentist: Thu 27/11, 10–11 a.m.)
+Bot:  📅 Dentista: qui 26/11 10:00–11:00
+      (📅 Dentist: Thu 26/11 10:00–11:00)
 
 Ana:  Comprar ração dos gatos
       (Buy cat food)
@@ -21,8 +21,8 @@ Bot:  ✅ TODO adicionado: Comprar ração dos gatos
 
 Ana:  cancela o dentista
       (cancel the dentist)
-Bot:  Quer mesmo cancelar "Dentista" (qui 27/11, 10h)?
-      (Do you really want to cancel "Dentist" (Thu 27/11, 10 a.m.)?)
+Bot:  Cancelo *Dentista* de qui 26/11 10:00? (sim/não)
+      (Cancel *Dentist* on Thu 26/11 10:00? (yes/no))
 
 Ana:  sim
       (yes)
@@ -102,6 +102,8 @@ uv run pytest
 ```
 
 A Neon branch works the same way: set `TEST_DATABASE_URL` to its connection string.
+
+`TEST_DATABASE_URL` must be exported in the shell: the tests read `os.environ`, not `.env`. Never point it at your production database, because the tests drop all tables.
 
 ## Project structure
 

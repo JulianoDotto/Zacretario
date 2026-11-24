@@ -65,7 +65,7 @@ Official docs (screens change often): https://developers.facebook.com/docs/whats
    3. Click **Generate token**, select your app, set expiration to **Never**, and tick `whatsapp_business_messaging` and `whatsapp_business_management`.
    4. Copy the token into `WHATSAPP_ACCESS_TOKEN`.
 6. Choose any random string as `WHATSAPP_VERIFY_TOKEN` in `.env` (you will type the same string into Meta in the webhook step below).
-7. Fill `ALLOWED_USERS` in `.env` with JSON mapping each phone (country code + number, digits only, no `+`) to a name, for example `{"5511900000000":"juliano","5511911111111":"maria"}`.
+7. Fill `ALLOWED_USERS` in `.env` with JSON mapping each phone (country code + number, digits only, no `+`) to a name, for example `{"5511900000000":"juliano","5511911111111":"maria"}`. Brazilian mobiles may arrive from WhatsApp with or without the extra 9 after the area code (12 or 13 digits); the bot accepts either form. If your messages are ignored anyway, look for the log line `Ignoring message from unknown number …` and copy that exact number into `ALLOWED_USERS`.
 8. Configure the webhook after the server is reachable (see the next section). In **WhatsApp > Configuration**:
    1. Click **Edit** on Webhook. Callback URL: `https://<your-public-host>/webhook`. Verify token: the exact value of `WHATSAPP_VERIFY_TOKEN`. Click **Verify and save**.
    2. In **Webhook fields**, click **Subscribe** on the `messages` field.

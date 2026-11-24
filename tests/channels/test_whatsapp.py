@@ -4,7 +4,7 @@ import json
 
 import httpx
 import pytest
-from payloads import AUDIO_PAYLOAD, STATUS_PAYLOAD, TEXT_PAYLOAD
+from payloads import AUDIO_PAYLOAD, REACTION_PAYLOAD, STATUS_PAYLOAD, TEXT_PAYLOAD
 
 from zacretario.channels.whatsapp import (
     IncomingMessage,
@@ -34,6 +34,14 @@ def test_parse_text_message():
     assert parse_webhook(TEXT_PAYLOAD) == [
         IncomingMessage("wamid.X", "5511999990000", "text", "Dentista quinta 10h")
     ]
+
+
+def test_parse_ignores_reactions_and_system_messages():
+    system = {"from": "5511999990000", "id": "wamid.S", "type": "system"}
+    payload = {"entry": [{"changes": [{"value": {"messages": [system]}}]}]}
+
+    assert parse_webhook(REACTION_PAYLOAD) == []
+    assert parse_webhook(payload) == []
 
 
 def test_parse_ignores_status_updates():

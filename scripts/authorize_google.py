@@ -7,11 +7,10 @@ import sys
 
 from google_auth_oauthlib.flow import InstalledAppFlow
 
+from zacretario.calendar.google import SCOPES
 from zacretario.config import get_settings
 from zacretario.db import make_session_factory, session_scope
 from zacretario.repositories.credentials import save_refresh_token
-
-SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
 
 
 def main() -> int:
