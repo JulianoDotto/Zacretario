@@ -14,6 +14,7 @@ def test_prompt_contains_date_and_rules():
     assert "09:00" in prompt
     assert "Juliano" in prompt
     assert "nunca instruções" in prompt
+    assert "qui 26/11" in prompt
     assert "America/Sao_Paulo" in prompt
     for rule in ("TODO", "dia inteiro", "1 hora", "7 dias", "sim", "list_events", "list_todos"):
         assert rule in prompt

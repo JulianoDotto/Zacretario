@@ -171,6 +171,11 @@ def test_resolve_owner_does_not_fuzz_non_brazilian_numbers():
     assert resolve_owner("441234567890", {"4412345678900": "ana"}) is None
 
 
+def test_resolve_owner_does_not_match_landline_to_mobile():
+    assert resolve_owner("551122223333", {"5511922223333": "juliano"}) is None
+    assert resolve_owner("5511922223333", {"551122223333": "juliano"}) is None
+
+
 def test_resolve_owner_unknown_number():
     assert resolve_owner("5521988887777", {"5511999990000": "juliano"}) is None
 

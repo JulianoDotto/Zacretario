@@ -157,7 +157,9 @@ class GoogleCalendarProvider:
 
 def _has_attendees(item: dict) -> bool:
     """True when the event is not safely ours to edit: other guests or another organizer."""
-    organized_by_someone_else = item.get("organizer", {}).get("self") is False
+    # The API omits "self" when it is false, so a missing key means someone else.
+    organizer = item.get("organizer")
+    organized_by_someone_else = organizer is not None and not organizer.get("self")
     return organized_by_someone_else or any(not a.get("self") for a in item.get("attendees", []))
 
 

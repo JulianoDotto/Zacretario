@@ -37,7 +37,8 @@ def resolve_owner(sender: str, allowed_users: dict[str, str]) -> str | None:
 
 
 def _without_ninth_digit(number: str) -> str:
-    if number.startswith("55") and len(number) == 13 and number[4] == "9":
+    # Only mobiles (9 followed by 6-9) have the extra digit; landlines never do.
+    if number.startswith("55") and len(number) == 13 and number[4] == "9" and number[5] in "6789":
         return number[:4] + number[5:]
     return number
 

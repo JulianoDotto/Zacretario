@@ -253,7 +253,7 @@ register(
         description=(
             "Altera um compromisso (id vindo de list_events). Use null no que não deve mudar. "
             "Mudando só a data ou o início, a duração original é mantida. "
-            "Eventos com convidados não podem ser alterados."
+            "Eventos com convidados ou organizados por outra pessoa não podem ser alterados."
         ),
         input_schema=_schema(
             {
@@ -272,7 +272,7 @@ register(
         name="delete_event",
         description=(
             "Apaga um compromisso (id vindo de list_events). "
-            "Eventos com convidados não podem ser apagados."
+            "Eventos com convidados ou organizados por outra pessoa não podem ser apagados."
         ),
         input_schema=_schema({"event_id": {"type": "string", "description": "Id do evento."}}),
         handler=_delete_event,

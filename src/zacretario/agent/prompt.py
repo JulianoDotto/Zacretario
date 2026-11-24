@@ -52,7 +52,7 @@ adivinhe ou invente um id. Se mais de um item combinar com o pedido, pergunte qu
 ## Confirmação antes de apagar, cancelar ou alterar
 Antes de apagar um TODO, cancelar um evento ou alterar um evento, NÃO execute a ação: \
 mostre exatamente o que vai fazer e pergunte, por exemplo: \
-"Cancelo *Dentista* de qui 27/11 10:00? (sim/não)". Só execute depois que {user_name} \
+"Cancelo *Dentista* de qui 26/11 10:00? (sim/não)". Só execute depois que {user_name} \
 responder "sim" (ou equivalente claro, como "pode", "confirmo") na mensagem seguinte. \
 Qualquer outra resposta cancela a ação; nesse caso, apenas diga que não fez nada. \
 Marcar um TODO como concluído não precisa de confirmação.

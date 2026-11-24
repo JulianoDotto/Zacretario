@@ -169,6 +169,30 @@ def test_update_and_delete_refuse_event_organized_by_someone_else(provider, serv
     _events(service).delete.assert_not_called()
 
 
+def test_organizer_without_self_key_is_someone_else(provider, service):
+    # The API omits read-only booleans that are false, so "self" is usually absent.
+    _events(service).get.return_value.execute.return_value = _event_organized_by({"email": "x"})
+
+    with pytest.raises(EventHasAttendeesError):
+        provider.update_event("5", title="Novo")
+    with pytest.raises(EventHasAttendeesError):
+        provider.delete_event("5")
+
+    _events(service).patch.assert_not_called()
+    _events(service).delete.assert_not_called()
+
+
+def test_event_without_organizer_is_editable(provider, service):
+    item = _event_organized_by({})
+    del item["organizer"]
+    _events(service).get.return_value.execute.return_value = item
+    _events(service).patch.return_value.execute.return_value = item
+
+    provider.update_event("5", title="Novo")
+
+    _events(service).patch.assert_called_once()
+
+
 def test_update_allows_event_organized_by_me(provider, service):
     _events(service).get.return_value.execute.return_value = _event_organized_by(
         {"email": "me", "self": True}
