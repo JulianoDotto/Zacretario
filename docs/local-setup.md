@@ -53,6 +53,8 @@ Without `TEST_DATABASE_URL`, tests fall back to in-memory SQLite.
 
 Official docs (screens change often): https://developers.facebook.com/docs/whatsapp/cloud-api/get-started
 
+> **Read [meta-whatsapp-notes.md](meta-whatsapp-notes.md) before or while doing this section.** It lists the errors the first real setup hit and how each was solved. In short: Meta's free test number cannot deliver to users in Brazil (error 130497), and a Meta-provided production number stops sending until its display name is approved (error 131037). For users in Brazil, plan on registering your own number (a SIM card not active in the WhatsApp app). Also make sure the WhatsApp Business Account is subscribed to your app ("Subscribe webhooks"), and publish the Meta app.
+
 1. Go to https://developers.facebook.com/, log in and create an app: use case **Other**, app type **Business**.
 2. On the app dashboard add the **WhatsApp** product. Meta creates a free **test phone number** for you; use it (no real number needed).
 3. In **WhatsApp > API Setup**:

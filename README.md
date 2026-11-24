@@ -79,7 +79,7 @@ Follow [docs/local-setup.md](docs/local-setup.md) in order:
 1. [Docker (test database)](docs/local-setup.md#docker-test-database)
 2. [Neon (database)](docs/local-setup.md#neon-database)
 3. [Google Cloud (Calendar)](docs/local-setup.md#google-cloud-calendar)
-4. [Meta / WhatsApp](docs/local-setup.md#meta--whatsapp)
+4. [Meta / WhatsApp](docs/local-setup.md#meta--whatsapp), with the lessons from the first real setup in [docs/meta-whatsapp-notes.md](docs/meta-whatsapp-notes.md)
 5. [Running locally with a tunnel](docs/local-setup.md#running-locally-with-a-tunnel)
 6. [Acceptance checklist](docs/local-setup.md#acceptance-checklist)
 

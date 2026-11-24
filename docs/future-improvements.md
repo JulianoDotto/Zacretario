@@ -43,3 +43,8 @@ Each skill is a schema plus a function registered in `src/zacretario/agent/regis
 - **Pruning old rows.** `processed_messages` and `conversation_messages` only grow. A periodic job could delete deduplication rows older than a few days and conversation rows older than the history window.
 - **Per-user serialization.** Two messages from the same user sent close together run in separate background tasks and can interleave (for example, a "yes" racing the message it confirms). A per-owner lock or queue in `src/zacretario/service.py` would process them in order.
 - **Timed event back to all-day.** `update_event` can turn an all-day event into a timed one, but not the reverse. Supporting it needs a way for the tool to say "make this all-day" (for example an `all_day` flag) and a call to `_time_field` with `clear_other`.
+
+## Observability of WhatsApp delivery
+
+- **Log failed deliveries.** Meta reports delivery asynchronously in `statuses` webhooks (`sent`, `delivered`, `read`, `failed` with an `errors` array). `parse_webhook` currently drops them, so a reply Meta accepted but could not deliver is invisible. Logging `failed` statuses with their error code in `src/zacretario/main.py` (or a small handler next to `parse_webhook`) would have made errors 130497 and 131037 obvious; see [meta-whatsapp-notes.md](meta-whatsapp-notes.md).
+- **Log the Graph API error body.** `WhatsAppClient.send_text` raises on a `400` without the response body, which holds `error.code` and `error.message`. Logging `response.text` before raising is a one-line change.
