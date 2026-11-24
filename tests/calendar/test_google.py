@@ -298,3 +298,27 @@ def test_other_http_error_becomes_calendar_error(provider, service):
     with pytest.raises(CalendarError) as info:
         provider.delete_event("1")
     assert not isinstance(info.value, EventNotFoundError)
+
+
+def test_get_event_maps_fields(provider, service):
+    _events(service).get.return_value.execute.return_value = {
+        "id": "abc",
+        "summary": "Dentista",
+        "start": {"dateTime": "2026-11-27T10:00:00-03:00"},
+        "end": {"dateTime": "2026-11-27T11:00:00-03:00"},
+        "attendees": [{"email": "x@example.com"}],
+    }
+
+    event = provider.get_event("abc")
+
+    assert event.id == "abc"
+    assert event.start == datetime(2026, 11, 27, 10, 0, tzinfo=SP)
+    assert event.has_attendees is True
+
+
+def test_get_event_missing_raises_not_found(provider, service):
+    error = HttpError(httplib2.Response({"status": 404}), b"not found")
+    _events(service).get.return_value.execute.side_effect = error
+
+    with pytest.raises(EventNotFoundError):
+        provider.get_event("nope")

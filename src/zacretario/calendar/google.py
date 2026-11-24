@@ -39,6 +39,10 @@ class GoogleCalendarProvider:
             if item.get("status") != "cancelled"
         ]
 
+    def get_event(self, event_id: str) -> CalendarEvent:
+        item = self._execute(self._events.get(calendarId=self._calendar_id, eventId=event_id))
+        return self._to_event(item)
+
     def create_event(
         self,
         title: str,

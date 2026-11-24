@@ -31,6 +31,10 @@ class CalendarProvider(Protocol):
 
     def list_events(self, start: datetime, end: datetime) -> list[CalendarEvent]: ...
 
+    def get_event(self, event_id: str) -> CalendarEvent:
+        """Raises EventNotFoundError if the event does not exist."""
+        ...
+
     def create_event(
         self,
         title: str,
