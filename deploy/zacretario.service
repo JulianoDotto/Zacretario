@@ -1,0 +1,19 @@
+[Unit]
+Description=Zacretario WhatsApp secretary bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=zacretario
+Group=zacretario
+# Settings are read from .env in the working directory.
+WorkingDirectory=/opt/zacretario
+EnvironmentFile=/opt/zacretario/.env
+# Bound to localhost: only Caddy (same machine) can reach it.
+ExecStart=/opt/zacretario/.venv/bin/uvicorn zacretario.main:get_app --factory --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
