@@ -7,9 +7,9 @@ Wants=network-online.target
 Type=simple
 User=zacretario
 Group=zacretario
-# Settings are read from .env in the working directory.
+# Settings come from /opt/zacretario/.env via the working directory. No EnvironmentFile=:
+# systemd would strip the quotes from JSON values such as ALLOWED_USERS.
 WorkingDirectory=/opt/zacretario
-EnvironmentFile=/opt/zacretario/.env
 # Bound to localhost: only Caddy (same machine) can reach it.
 ExecStart=/opt/zacretario/.venv/bin/uvicorn zacretario.main:get_app --factory --host 127.0.0.1 --port 8000
 Restart=always

@@ -9,7 +9,7 @@ This guide puts Zacretario on a Hostinger VPS KVM 1 running Ubuntu, as a systemd
 - The services from [local-setup.md](local-setup.md) already configured: [Neon](local-setup.md#neon-database), [Google Cloud](local-setup.md#google-cloud-calendar) and [Meta / WhatsApp](local-setup.md#meta--whatsapp).
 - Ideally a dedicated WhatsApp number registered in Meta (see step 8).
 
-In the commands below, replace `bot.yourdomain.com` with your domain.
+In the commands below, replace `zacretario.example.com` with your real domain. Every command is meant to be run from any directory (they use `cd` inside `bash -c` where needed), because the `zacretario` user's home is not readable by other users.
 
 ## 1. Base packages, firewall and user
 
@@ -26,6 +26,8 @@ sudo ufw allow 22/tcp && sudo ufw allow 80/tcp && sudo ufw allow 443/tcp
 sudo ufw enable
 ```
 
+`ufw enable` may warn that it can disrupt SSH connections: that is fine as long as port 22 was allowed first. If your SSH server uses a non-default port, allow that port too (`sudo ufw allow <port>/tcp`) before enabling.
+
 Create an unprivileged user that owns the app and runs the service:
 
 ```bash
@@ -37,7 +39,7 @@ sudo useradd --system --create-home --home-dir /opt/zacretario --shell /usr/sbin
 Install uv for the `zacretario` user (so the virtualenv and Python belong to it):
 
 ```bash
-sudo -u zacretario -H bash -c 'curl -LsSf https://astral.sh/uv/install.sh | sh'
+sudo -u zacretario -H bash -c 'cd ~ && curl -LsSf https://astral.sh/uv/install.sh | sh'
 ```
 
 Install Caddy from its official apt repository (see https://caddyserver.com/docs/install#debian-ubuntu-raspbian if this changes):
@@ -45,6 +47,7 @@ Install Caddy from its official apt repository (see https://caddyserver.com/docs
 ```bash
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+sudo chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg /etc/apt/sources.list.d/caddy-stable.list
 sudo apt update && sudo apt install -y caddy
 ```
 
@@ -53,10 +56,8 @@ sudo apt update && sudo apt install -y caddy
 `/opt/zacretario` already exists (it is the home of the `zacretario` user). Clone into it:
 
 ```bash
-sudo -u zacretario -H git clone <your-repo-url> /opt/zacretario/app-tmp
-sudo -u zacretario -H bash -c 'shopt -s dotglob && mv /opt/zacretario/app-tmp/* /opt/zacretario/ && rmdir /opt/zacretario/app-tmp'
-cd /opt/zacretario
-sudo -u zacretario -H /opt/zacretario/.local/bin/uv sync --frozen
+sudo -u zacretario -H bash -c 'cd /opt/zacretario && git clone <your-repo-url> app-tmp && shopt -s dotglob && mv app-tmp/* . && rmdir app-tmp'
+sudo -u zacretario -H bash -c 'cd /opt/zacretario && .local/bin/uv sync --frozen'
 ```
 
 (If the repository is private, use a deploy key or a token in the clone URL.)
@@ -64,9 +65,8 @@ sudo -u zacretario -H /opt/zacretario/.local/bin/uv sync --frozen
 ## 4. Create the `.env`
 
 ```bash
-sudo -u zacretario -H cp /opt/zacretario/.env.example /opt/zacretario/.env
+sudo -u zacretario -H bash -c 'cd /opt/zacretario && cp .env.example .env && chmod 600 .env'
 sudo -u zacretario -H nano /opt/zacretario/.env
-sudo chmod 600 /opt/zacretario/.env
 ```
 
 Fill in every value as described in [local-setup.md](local-setup.md) (`DATABASE_URL`, Anthropic key, Google, WhatsApp, `ALLOWED_USERS`, `TIMEZONE`). `.env` holds secrets: only the `zacretario` user should read it, and it must never be committed.
@@ -74,8 +74,7 @@ Fill in every value as described in [local-setup.md](local-setup.md) (`DATABASE_
 ## 5. Run the migrations
 
 ```bash
-cd /opt/zacretario
-sudo -u zacretario -H /opt/zacretario/.local/bin/uv run alembic upgrade head
+sudo -u zacretario -H bash -c 'cd /opt/zacretario && .local/bin/uv run alembic upgrade head'
 ```
 
 The Google Calendar authorization for each user is stored in the database, so if you already authorized users against the same Neon database during local setup, there is nothing more to do (see [Google Cloud (Calendar)](local-setup.md#google-cloud-calendar) otherwise).
@@ -100,14 +99,14 @@ Check it:
 
 ```bash
 systemctl status zacretario
-curl https://bot.yourdomain.com/health
+curl https://zacretario.example.com/health
 ```
 
 The health check must return `{"status":"ok"}`. If HTTPS fails, confirm DNS resolves to the VPS and ports 80/443 are open, then read `journalctl -u caddy`.
 
 ## 8. Point Meta at the server
 
-Set the webhook Callback URL to `https://bot.yourdomain.com/webhook`, with the same verify token as `WHATSAPP_VERIFY_TOKEN`, and make sure the `messages` field is subscribed. The steps are in [Meta / WhatsApp](local-setup.md#meta--whatsapp), step 8 (replace the tunnel URL if you used one).
+Set the webhook Callback URL to `https://zacretario.example.com/webhook`, with the same verify token as `WHATSAPP_VERIFY_TOKEN`, and make sure the `messages` field is subscribed. The steps are in [Meta / WhatsApp](local-setup.md#meta--whatsapp), step 8 (replace the tunnel URL if you used one).
 
 ### Moving from the test number to a dedicated number
 
@@ -121,10 +120,7 @@ The permanent token and app secret stay the same as long as it is the same Meta 
 ## Updating
 
 ```bash
-cd /opt/zacretario
-sudo -u zacretario -H git pull
-sudo -u zacretario -H /opt/zacretario/.local/bin/uv sync --frozen
-sudo -u zacretario -H /opt/zacretario/.local/bin/uv run alembic upgrade head
+sudo -u zacretario -H bash -c 'cd /opt/zacretario && git pull && .local/bin/uv sync --frozen && .local/bin/uv run alembic upgrade head'
 sudo systemctl restart zacretario
 ```
 
@@ -137,6 +133,6 @@ journalctl -u zacretario -f
 ## Security basics
 
 - The service runs as the unprivileged `zacretario` user, never as root.
-- `.env` is `chmod 600` and owned by `zacretario`.
+- `.env` is `chmod 600` and owned by `zacretario`. The service reads it through its working directory, not `EnvironmentFile=` (systemd would strip the quotes from JSON values like `ALLOWED_USERS`).
 - `ufw` allows only ports 22, 80 and 443.
 - uvicorn listens on `127.0.0.1:8000`, so it is reachable only through Caddy (HTTPS).
