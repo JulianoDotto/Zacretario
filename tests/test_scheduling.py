@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from zacretario.scheduling import Availability, find_free_slots
@@ -8,8 +8,8 @@ RANGE_START = datetime(2026, 11, 30, 0, 0, tzinfo=SP)  # Monday
 RANGE_END = datetime(2026, 12, 7, 0, 0, tzinfo=SP)  # after Sunday
 
 
-def dt(day: int, hour: int, minute: int = 0, month: int = 11) -> datetime:
-    return datetime(2026, month, day, hour, minute, tzinfo=SP)
+def dt(day: int, hour: int, minute: int = 0) -> datetime:
+    return datetime(2026, 11, day, hour, minute, tzinfo=SP)
 
 
 def search(busy=(), *, duration=timedelta(hours=1), availability=None, **kwargs):
@@ -43,6 +43,7 @@ def test_skips_blocked_weekdays():
 
     slots = search(availability=availability)
 
+    assert slots
     assert all(s[0].date().day != 30 for s in slots)
 
 
@@ -64,3 +65,21 @@ def test_range_start_mid_day():
     slots = search(range_start=dt(30, 15, 10), max_slots=1)
 
     assert slots[0][0] == dt(30, 15, 15)
+
+
+def test_returns_slots_in_given_timezone_for_utc_inputs():
+    busy = [(datetime(2026, 11, 30, 11, 0, tzinfo=UTC), datetime(2026, 11, 30, 12, 5, tzinfo=UTC))]
+
+    slots = search(busy, range_start=RANGE_START.astimezone(UTC), max_slots=1)
+
+    assert slots[0][0] == dt(30, 9, 30)
+    assert slots[0][0].tzinfo == SP
+    assert slots[0][1].tzinfo == SP
+
+
+def test_overlapping_busy_intervals():
+    busy = [(dt(30, 8), dt(30, 10)), (dt(30, 9), dt(30, 11))]
+
+    slots = search(busy, max_slots=1)
+
+    assert slots == [(dt(30, 11, 15), dt(30, 12, 15))]

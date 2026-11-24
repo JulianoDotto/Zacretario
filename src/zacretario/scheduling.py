@@ -25,10 +25,15 @@ def find_free_slots(
     max_slots: int = 5,
 ) -> list[tuple[datetime, datetime]]:
     """Propose at most one free slot per day, in chronological order."""
-    padded_busy = sorted((start - buffer, end + buffer) for start, end in busy)
+    # Convert everything to `tz` so returned slots are in the user's timezone.
+    range_start = range_start.astimezone(tz)
+    range_end = range_end.astimezone(tz)
+    padded_busy = sorted(
+        (start.astimezone(tz) - buffer, end.astimezone(tz) + buffer) for start, end in busy
+    )
     slots: list[tuple[datetime, datetime]] = []
 
-    for day in _days_between(range_start.astimezone(tz), range_end.astimezone(tz)):
+    for day in _days_between(range_start, range_end):
         if len(slots) >= max_slots:
             break
         if day.weekday() in availability.blocked_weekdays:
