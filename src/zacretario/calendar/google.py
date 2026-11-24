@@ -46,6 +46,7 @@ class GoogleCalendarProvider:
         end: datetime | date,
         all_day: bool,
     ) -> CalendarEvent:
+        self._check_types(start, end, all_day)
         body = {
             "summary": title,
             "start": self._time_field(start, all_day),
@@ -66,17 +67,19 @@ class GoogleCalendarProvider:
         end: datetime | date | None = None,
         all_day: bool | None = None,
     ) -> CalendarEvent:
-        current = self._get_editable(event_id)
-        if all_day is None:
-            all_day = "date" in current["start"]
+        self._get_editable(event_id)
 
         body: dict = {}
         if title is not None:
             body["summary"] = title
-        if start is not None:
-            body["start"] = self._time_field(start, all_day)
-        if end is not None:
-            body["end"] = self._time_field(end, all_day)
+
+        time_args = (start, end, all_day)
+        if any(arg is not None for arg in time_args):
+            if any(arg is None for arg in time_args):
+                raise CalendarError("start, end e all_day devem ser informados juntos")
+            self._check_types(start, end, all_day)
+            body["start"] = self._time_field(start, all_day, clear_other=True)
+            body["end"] = self._time_field(end, all_day, clear_other=True)
 
         item = self._execute(
             self._events.patch(
@@ -109,13 +112,28 @@ class GoogleCalendarProvider:
                 raise EventNotFoundError(str(error)) from error
             raise CalendarError(str(error)) from error
 
-    def _time_field(self, value: datetime | date, all_day: bool) -> dict:
+    def _check_types(self, start, end, all_day: bool) -> None:
+        for value in (start, end):
+            if all_day and (isinstance(value, datetime) or not isinstance(value, date)):
+                raise CalendarError("evento de dia inteiro exige date, não datetime")
+            if not all_day and (not isinstance(value, datetime) or value.tzinfo is None):
+                raise CalendarError("evento com hora exige datetime com fuso")
+
+    def _time_field(self, value: datetime | date, all_day: bool, clear_other: bool = False) -> dict:
+        # events.patch merges nested objects, so when switching between all-day
+        # and timed we must explicitly null the keys of the old format.
         if all_day:
-            return {"date": value.isoformat()}
-        return {
+            field = {"date": value.isoformat()}
+            if clear_other:
+                field.update({"dateTime": None, "timeZone": None})
+            return field
+        field = {
             "dateTime": value.astimezone(self._tz).isoformat(),
-            "timeZone": str(self._tz),
+            "timeZone": self._tz.key,
         }
+        if clear_other:
+            field["date"] = None
+        return field
 
     def _parse_time(self, field: dict) -> datetime | date:
         if "dateTime" in field:

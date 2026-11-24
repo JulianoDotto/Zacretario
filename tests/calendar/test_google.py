@@ -7,6 +7,7 @@ import pytest
 from googleapiclient.errors import HttpError
 
 from zacretario.calendar.base import (
+    CalendarError,
     CalendarEvent,
     EventHasAttendeesError,
     EventNotFoundError,
@@ -188,3 +189,112 @@ def test_missing_event_raises_not_found(provider, service):
 
     with pytest.raises(EventNotFoundError):
         provider.delete_event("nope")
+
+
+def _existing(service, start, end, **extra):
+    _events(service).get.return_value.execute.return_value = {
+        "id": "1",
+        "summary": "X",
+        "start": start,
+        "end": end,
+        **extra,
+    }
+    _events(service).patch.return_value.execute.return_value = {
+        "id": "1",
+        "summary": "X",
+        "start": start,
+        "end": end,
+    }
+
+
+def test_update_all_day_to_timed_nulls_date(provider, service):
+    _existing(service, {"date": "2026-11-28"}, {"date": "2026-11-29"})
+
+    provider.update_event(
+        "1",
+        start=datetime(2026, 11, 28, 9, 0, tzinfo=SP),
+        end=datetime(2026, 11, 28, 10, 0, tzinfo=SP),
+        all_day=False,
+    )
+
+    kwargs = _events(service).patch.call_args.kwargs
+    assert kwargs["sendUpdates"] == "none"
+    assert kwargs["body"]["start"] == {
+        "dateTime": "2026-11-28T09:00:00-03:00",
+        "timeZone": "America/Sao_Paulo",
+        "date": None,
+    }
+    assert kwargs["body"]["end"]["date"] is None
+
+
+def test_update_timed_to_all_day_nulls_datetime(provider, service):
+    _existing(
+        service,
+        {"dateTime": "2026-11-28T09:00:00-03:00"},
+        {"dateTime": "2026-11-28T10:00:00-03:00"},
+    )
+
+    provider.update_event("1", start=date(2026, 11, 28), end=date(2026, 11, 29), all_day=True)
+
+    kwargs = _events(service).patch.call_args.kwargs
+    assert kwargs["sendUpdates"] == "none"
+    assert kwargs["body"]["start"] == {
+        "date": "2026-11-28",
+        "dateTime": None,
+        "timeZone": None,
+    }
+    assert kwargs["body"]["end"]["dateTime"] is None
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"start": datetime(2026, 11, 28, 9, tzinfo=SP)},
+        {"all_day": True},
+        {"start": date(2026, 11, 28), "end": date(2026, 11, 29)},
+    ],
+)
+def test_update_partial_time_args_raise(provider, service, kwargs):
+    _existing(service, {"date": "2026-11-28"}, {"date": "2026-11-29"})
+
+    with pytest.raises(CalendarError):
+        provider.update_event("1", **kwargs)
+
+    _events(service).patch.assert_not_called()
+
+
+def test_wrong_types_raise(provider, service):
+    d = date(2026, 11, 28)
+    dt = datetime(2026, 11, 28, 9, tzinfo=SP)
+    with pytest.raises(CalendarError):
+        provider.create_event("X", dt, dt, True)
+    with pytest.raises(CalendarError):
+        provider.create_event("X", d, d, False)
+    _events(service).insert.assert_not_called()
+
+    _existing(service, {"date": "2026-11-28"}, {"date": "2026-11-29"})
+    with pytest.raises(CalendarError):
+        provider.update_event("1", start=d, end=d, all_day=False)
+    _events(service).patch.assert_not_called()
+
+
+def test_update_allowed_when_only_self_attends(provider, service):
+    _existing(
+        service,
+        {"date": "2026-11-28"},
+        {"date": "2026-11-29"},
+        attendees=[{"email": "me", "self": True}],
+    )
+
+    provider.update_event("1", title="Novo")
+
+    _events(service).patch.assert_called_once()
+
+
+def test_other_http_error_becomes_calendar_error(provider, service):
+    error = HttpError(httplib2.Response({"status": 500}), b"boom")
+    _events(service).get.return_value.execute.side_effect = error
+
+    with pytest.raises(CalendarError) as info:
+        provider.delete_event("1")
+    assert not isinstance(info.value, EventNotFoundError)

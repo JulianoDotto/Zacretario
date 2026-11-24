@@ -47,6 +47,11 @@ class CalendarProvider(Protocol):
         start: datetime | date | None = None,
         end: datetime | date | None = None,
         all_day: bool | None = None,
-    ) -> CalendarEvent: ...
+    ) -> CalendarEvent:
+        """Time changes need start, end and all_day together (else CalendarError).
+
+        all_day=True requires `date` values; all_day=False requires aware datetimes.
+        """
+        ...
 
     def delete_event(self, event_id: str) -> None: ...
