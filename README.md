@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/assets/zacretario-avatar.png" alt="Zacretário logo: a calendar with a Z and a green check mark" width="160"></p>
+
 # Zacretário
 
 A personal secretary that lives in a WhatsApp chat. Write in plain language, and a Claude tool-use agent files the appointment in Google Calendar or adds the task to your to-do list.
