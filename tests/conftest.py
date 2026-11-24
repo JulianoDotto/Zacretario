@@ -1,7 +1,7 @@
 import os
 
 import pytest
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 import zacretario.models  # noqa: F401  (registers the tables on Base.metadata)
 from zacretario.db import Base, make_session_factory
@@ -22,3 +22,9 @@ def session():
         db_session.close()
         Base.metadata.drop_all(engine)
         engine.dispose()
+
+
+@pytest.fixture
+def session_factory(session):
+    # Same engine as the `session` fixture, so tests see what the service commits.
+    return sessionmaker(bind=session.get_bind(), expire_on_commit=False)
