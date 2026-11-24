@@ -1,5 +1,7 @@
+import copy
 from dataclasses import replace
 from datetime import date, datetime, time
+from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
 from zacretario.calendar.base import (
@@ -87,3 +89,35 @@ def _check_types(start, end, all_day: bool) -> None:
             raise CalendarError("evento de dia inteiro exige date, não datetime")
         if not all_day and (not isinstance(value, datetime) or value.tzinfo is None):
             raise CalendarError("evento com hora exige datetime com fuso")
+
+
+def text_block(text: str) -> SimpleNamespace:
+    return SimpleNamespace(type="text", text=text)
+
+
+def tool_use_block(block_id: str, name: str, tool_input: dict) -> SimpleNamespace:
+    return SimpleNamespace(type="tool_use", id=block_id, name=name, input=tool_input)
+
+
+def response(stop_reason: str, *blocks: SimpleNamespace) -> SimpleNamespace:
+    return SimpleNamespace(stop_reason=stop_reason, content=list(blocks))
+
+
+class FakeAnthropic:
+    """Stands in for anthropic.Anthropic: replays scripted responses and records each call.
+
+    `responses` is a list, or a callable that builds the next response from the call index.
+    """
+
+    def __init__(self, responses) -> None:
+        self._responses = responses
+        self.calls: list[dict] = []
+        self.beta = SimpleNamespace(messages=SimpleNamespace(create=self._create))
+
+    def _create(self, **kwargs) -> SimpleNamespace:
+        # Snapshot the messages: the agent keeps appending to the same list.
+        self.calls.append({**kwargs, "messages": copy.deepcopy(kwargs["messages"])})
+        index = len(self.calls) - 1
+        if callable(self._responses):
+            return self._responses(index)
+        return self._responses[index]
