@@ -1,1 +1,7 @@
 .superpowers/
+.env
+.venv/
+__pycache__/
+*.db
+token*.json
+client_secret*.json
