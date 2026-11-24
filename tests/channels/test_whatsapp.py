@@ -3,6 +3,7 @@ import hmac
 import json
 
 import httpx
+import pytest
 from payloads import AUDIO_PAYLOAD, STATUS_PAYLOAD, TEXT_PAYLOAD
 
 from zacretario.channels.whatsapp import (
@@ -102,8 +103,6 @@ def test_send_text_skips_blank_and_raises_on_error():
     _client(ok).send_text("1", "  \n ")
     assert calls == []
 
-    import pytest
-
     with pytest.raises(httpx.HTTPStatusError):
         _client(lambda r: httpx.Response(401)).send_text("1", "oi")
 
@@ -111,3 +110,21 @@ def test_send_text_skips_blank_and_raises_on_error():
 def test_split_preserves_blank_lines():
     text = "\nA\n\nB\n"
     assert "\n".join(split_message(text, limit=3)) == text
+
+
+def test_verify_signature_rejects_non_ascii_header():
+    assert verify_signature("secret", b"{}", "sha256=é") is False
+
+
+def test_send_text_skips_blank_parts():
+    bodies = []
+
+    def handler(request):
+        bodies.append(json.loads(request.content)["text"]["body"])
+        return httpx.Response(200, json={})
+
+    _client(handler).send_text("1", "a" * 4096 + "\n")
+    assert bodies == ["a" * 4096]
+    bodies.clear()
+    _client(handler).send_text("1", "\n" + "a" * 5000)
+    assert bodies and all(b.strip() for b in bodies)

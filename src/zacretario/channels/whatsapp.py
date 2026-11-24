@@ -20,7 +20,7 @@ def verify_signature(app_secret: str, body: bytes, signature_header: str | None)
     if not signature_header or not signature_header.startswith("sha256="):
         return False
     expected = hmac.new(app_secret.encode(), body, hashlib.sha256).hexdigest()
-    return hmac.compare_digest(expected, signature_header.removeprefix("sha256="))
+    return hmac.compare_digest(expected.encode(), signature_header.removeprefix("sha256=").encode())
 
 
 def parse_webhook(payload: dict) -> list[IncomingMessage]:
@@ -80,6 +80,8 @@ class WhatsAppClient:
         if not text.strip():
             return
         for part in split_message(text):
+            if not part.strip():
+                continue
             response = self._http.post(
                 self._url,
                 headers={"Authorization": f"Bearer {self._token}"},
