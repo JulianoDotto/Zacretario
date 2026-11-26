@@ -88,6 +88,23 @@ Os tokens são somados por mensagem (todas as chamadas ao modelo). "passou?" é 
 | sonnet-low | T14 | ✅ | 1 | — | 5.303 | 0 | 0 | 105 | — |
 | sonnet-low | T15 | ✅ | 1 | — | 5.371 | 0 | 0 | 60 | — |
 | **sonnet-low** | **total (16 mensagens)** | **15/15** | **31** | | **160.242** (total, com cache) | 0 | 0 | **2.483** | **0,3453** |
+| haiku-low | T01 | ✅ | 2 | list_events, list_todos | 9.396 | 0 | 0 | 198 | 0,0010 |
+| haiku-low | T02 | ✅ (sem 📅) | 2 | create_event | 9.491 | 0 | 0 | 159 | 0,0010 |
+| haiku-low | T03 | ✅ | 2 | create_event | 9.703 | 0 | 0 | 286 | 0,0011 |
+| haiku-low | T04 | ✅ (sem 📅) | 2 | create_event | 9.843 | 0 | 0 | 229 | 0,0011 |
+| haiku-low | T05 ⚠️ | ✅ | 2 | create_event | 10.078 | 0 | 0 | 364 | 0,0012 |
+| haiku-low | T06 | ✅ | 2 | add_todo | 9.901 | 0 | 0 | 122 | 0,0011 |
+| haiku-low | T07 | ✅ | 2 | list_events | 10.130 | 0 | 0 | 187 | 0,0011 |
+| haiku-low | T08 | ❌ propôs 06:00, antes da janela 08:00 | 2 | find_free_slots | 10.578 | 0 | 0 | 558 | 0,0013 |
+| haiku-low | T09 | ✅ | 3 | get_preferences, update_preferences | 16.081 | 0 | 0 | 345 | 0,0018 |
+| haiku-low | T10 ⚠️ | ✅ | 2 | list_events | 10.986 | 0 | 0 | 257 | 0,0012 |
+| haiku-low | T11 ⚠️ | ✅ | 3 | list_events, delete_event | 16.942 | 0 | 0 | 337 | 0,0019 |
+| haiku-low | T12a ⚠️ | ✅ | 2 | list_todos | 10.912 | 0 | 0 | 219 | 0,0012 |
+| haiku-low | T12b ⚠️ | ✅ | 1 | — | 5.358 | 0 | 0 | 98 | 0,0006 |
+| haiku-low | T13 | ✅ | 3 | list_todos, complete_todo | 16.312 | 0 | 0 | 169 | 0,0017 |
+| haiku-low | T14 | ✅ | 1 | — | 5.340 | 0 | 0 | 70 | 0,0006 |
+| haiku-low | T15 | ✅ | 1 | — | 5.380 | 0 | 0 | 149 | 0,0006 |
+| **haiku-low** | **total (16 mensagens)** | **14/15 (⚠️ 7/7)** | **31** | | **166.431** | 0 | 0 | **3.747** | **0,0185** |
 
 **Primeira leitura (26/11):** cada chamada envia cerca de 4.600 tokens (prompt + 10 ferramentas) e recebe poucas centenas. Quase todo o custo é **entrada repetida**, e é isso que o cache barateia.
 
@@ -103,3 +120,8 @@ Observações:
 **Limitação da medição:** o n8n soma os tokens de cache no `promptTokens`, então a coluna "Entrada" é o total e não mostra o que veio do cache. Estimativa, supondo que o prefixo de ~4.500 tokens (ferramentas + prompt de sistema) seja lido do cache em 30 das 31 chamadas: ~135 mil lidos a US$ 0,10/M, ~21 mil gravados a US$ 2,50/M, saída a US$ 10/M, **≈ US$ 0,09 na rodada, ≈ US$ 0,006 por mensagem (−75%)**. **Precisa ser confirmado no console da Anthropic** (Usage, tokens "cache read" de 26/11).
 
 **Conferido no console da Anthropic (26/11):** gravação e leitura de cache do dia = **US$ 0**. O cache **não pegou**: a rodada custou o mesmo que sem cache (≈ US$ 0,32 de entrada + US$ 0,025 de saída ≈ **US$ 0,345**, −4% contra a base, só pelo effort low). A requisição registrada pelo n8n mostra `cache_control` no topo, mas nada foi gravado. Hipótese: a versão do n8n/LangChain não repassa esse campo para a API. A estimativa de −75% acima **não vale**.
+
+**Fase 2 — Haiku 5.5 + effort low (26/11):** todos os ⚠️ passaram (datas, confirmação antes de apagar, o "não"). **US$ 0,0185 na rodada, US$ 0,0012 por mensagem: −95% contra a linha de base.** Diferenças de qualidade:
+- **T08 ❌:** em "de manhã", passou `earliest_time` 06:00 e propôs horários às 6h, ignorando a janela 08:00–22:00 da pessoa. O Sonnet respeitou a janela.
+- Formato: ao criar evento, às vezes sem o 📅 (T02, T04); no T08 usou 🏃 no lugar de 📅; o T01 não separou agenda e TODOs em blocos com 📅/✅.
+- No resto, respostas certas e curtas.
