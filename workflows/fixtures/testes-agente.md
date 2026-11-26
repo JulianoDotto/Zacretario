@@ -71,6 +71,23 @@ Os tokens são somados por mensagem (todas as chamadas ao modelo). "passou?" é 
 | base | T14 | ✅ | 1 | — | 5.293 | 0 | 0 | 80 | 0,0114 |
 | base | T15 | ✅ | 1 | — | 5.328 | 0 | 0 | 62 | 0,0113 |
 | **base** | **total (16 mensagens)** | **15/15** | **32** | | **166.063** | 0 | 0 | **2.894** | **0,3611** |
+| sonnet-low | T01 | ✅ | 2 | list_events, list_todos | 9.311 | ? | ? | 208 | ver nota |
+| sonnet-low | T02 | ✅ | 2 | create_event | 9.592 | ? | ? | 162 | ver nota |
+| sonnet-low | T03 | ✅ | 2 | create_event | 9.749 | ? | ? | 205 | ver nota |
+| sonnet-low | T04 | ✅ | 2 | create_event | 9.832 | ? | ? | 162 | ver nota |
+| sonnet-low | T05 ⚠️ | ✅ | 2 | create_event | 9.978 | ? | ? | 195 | ver nota |
+| sonnet-low | T06 | ✅ | 2 | add_todo | 9.958 | ? | ? | 92 | ver nota |
+| sonnet-low | T07 | ✅ | 2 | list_events | 10.179 | ? | ? | 146 | ver nota |
+| sonnet-low | T08 | ✅ | 2 | find_free_slots | 10.544 | ? | ? | 403 | ver nota |
+| sonnet-low | T09 | ✅ | 2 | update_preferences | 10.568 | ? | ? | 223 | ver nota |
+| sonnet-low | T10 ⚠️ | ✅ | 2 | list_events | 10.984 | ? | ? | 117 | ver nota |
+| sonnet-low | T11 ⚠️ | ✅ | 3 | list_events, delete_event | 16.738 | ? | ? | 201 | ver nota |
+| sonnet-low | T12a ⚠️ | ✅ | 2 | list_todos | 10.711 | ? | ? | 54 | ver nota |
+| sonnet-low | T12b ⚠️ | ✅ | 1 | — | 5.310 | ? | ? | 40 | ver nota |
+| sonnet-low | T13 | ✅ | 3 | list_todos, complete_todo | 16.114 | ? | ? | 110 | ver nota |
+| sonnet-low | T14 | ✅ | 1 | — | 5.303 | ? | ? | 105 | ver nota |
+| sonnet-low | T15 | ✅ | 1 | — | 5.371 | ? | ? | 60 | ver nota |
+| **sonnet-low** | **total (16 mensagens)** | **15/15** | **31** | | **160.242** (total, com cache) | ? | ? | **2.483** | **~0,09 (estimativa)** |
 
 **Primeira leitura (26/11):** cada chamada envia cerca de 4.600 tokens (prompt + 10 ferramentas) e recebe poucas centenas. Quase todo o custo é **entrada repetida**, e é isso que o cache barateia.
 
@@ -80,3 +97,7 @@ Observações:
 - T03: "às 8h" já tinha passado, então foi para amanhã, e o bot explicou o porquê.
 - T09: atualizou a preferência e refez a lista de horários tirando o domingo, sem chamar `find_free_slots` de novo. Ficou certo, mas ele filtrou de cabeça.
 - Mensagens sem ferramenta (T12b, T14, T15) custam a metade: uma chamada só.
+
+**Fase 1 — Sonnet 5.5 + cache 5 min + effort low (26/11):** 15/15 de novo, inclusive os ⚠️. Saída caiu 14% (2.483 contra 2.894 tokens), e o T09 usou 2 chamadas em vez de 3. A requisição sai com `cache_control: {type: ephemeral, ttl: 5m}`, `thinking: adaptive` e `effort: low` (conferido nos dados da execução).
+
+**Limitação da medição:** o n8n soma os tokens de cache no `promptTokens`, então a coluna "Entrada" é o total e não mostra o que veio do cache. Estimativa, supondo que o prefixo de ~4.500 tokens (ferramentas + prompt de sistema) seja lido do cache em 30 das 31 chamadas: ~135 mil lidos a US$ 0,10/M, ~21 mil gravados a US$ 2,50/M, saída a US$ 10/M, **≈ US$ 0,09 na rodada, ≈ US$ 0,006 por mensagem (−75%)**. **Precisa ser confirmado no console da Anthropic** (Usage, tokens "cache read" de 26/11).
