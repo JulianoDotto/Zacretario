@@ -54,5 +54,6 @@ Os tokens são somados por mensagem (todas as chamadas ao modelo). "passou?" é 
 | Rodada | Teste | Passou? | Chamadas | Ferramentas | Entrada | Cache lido | Cache gravado | Saída | US$ |
 |---|---|---|---|---|---|---|---|---|---|
 | isolamento | "marca teste de isolamento amanhã às 10h" | ✅ (só na agenda de teste) | 2 | create_event | 9.376 | 0 | 0 | 170 | 0,0205 |
+| base | T01 | ✅ | 2 | list_events, list_todos | 9.311 | 0 | 0 | 189 | 0,0205 |
 
 **Primeira leitura (26/11):** cada chamada envia cerca de 4.600 tokens (prompt + 10 ferramentas) e recebe poucas centenas. Quase todo o custo é **entrada repetida**, e é isso que o cache barateia.
