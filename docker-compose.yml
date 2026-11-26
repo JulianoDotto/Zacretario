@@ -1,9 +1,0 @@
-services:
-  db:
-    image: postgres:17
-    environment:
-      POSTGRES_USER: zacretario
-      POSTGRES_PASSWORD: zacretario
-      POSTGRES_DB: zacretario_test
-    ports:
-      - "5433:5432"

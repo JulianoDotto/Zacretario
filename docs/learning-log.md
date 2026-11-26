@@ -102,3 +102,13 @@ Concepts:
 - Built-in memory is convenient, but you should know what it stores; when a provider adds constraints (signed reasoning), owning the history in your own table is simpler and more predictable.
 
 What went wrong: my first fix (turning thinking off) broke the agent for every message, and the error workflow reported exactly why within seconds — which is the point of having one.
+
+## Task 9 — Showcase and retrospective (2026-11-26)
+
+The five workflows were exported with the n8n CLI (`n8n export:workflow --all --separate`), then scrubbed before entering the repository: pinned data removed (it held a real message, my number and the Evolution instance token), instance metadata and owner data dropped, phone numbers replaced, and the files checked for tokens, e-mails and the server IP. Credentials are never exported; they are reconnected after import. The Python app was removed from the branch; it stays under the tag `v1-python`.
+
+Looking back:
+- **What n8n made easier:** webhooks, credentials and OAuth, retries and error workflows, and seeing every execution's data node by node. Most "plumbing" bugs were found by opening an execution, not by adding logs.
+- **What still needed code:** anything with real logic (dates and timezones, free slots, the read-only rule). Writing those Code nodes as files and testing them outside n8n paid off.
+- **What surprised me:** the bugs that mattered were not in the logic but at the edges — an invisible TAB in a field, a toggle that switched itself on, the AI provider's rules about memory. Error workflows and execution history are what made them cheap to find.
+- **Working style:** Claude navigated and explained; I built. When a step was repetitive (allowlist nodes, the five calendar tools), letting Claude build it through n8n's MCP server and then reading what it built was a good trade.

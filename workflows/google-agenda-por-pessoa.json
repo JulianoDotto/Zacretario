@@ -1,0 +1,188 @@
+{
+  "id": "qUk0ljtNQDiOvjy2",
+  "name": "Google Agenda (por pessoa)",
+  "description": "O único lugar com credenciais Google. Recebe {user_key, method, url, query, body} e faz a chamada com a credencial da pessoa (um ramo do Switch por pessoa).",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "user_key"
+            },
+            {
+              "name": "method"
+            },
+            {
+              "name": "url"
+            },
+            {
+              "name": "query",
+              "type": "object"
+            },
+            {
+              "name": "body",
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "id": "a5bc696f-6ec0-4163-9684-05690cd0e82e",
+      "name": "Pedido",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.user_key }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "juliano",
+                    "id": "d91e0558-28c2-41d1-ae47-75acf081af06"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Sem agenda"
+        }
+      },
+      "id": "e2d210a9-0424-4762-bf7d-16d8e24f437b",
+      "name": "Qual pessoa?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        224,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "method": "={{ $json.method }}",
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={{ JSON.stringify($json.query || {}) }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body || {}) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "d9e3d35f-9dbd-4f4a-a821-618b93c7e109",
+      "name": "Agenda - Juliano",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        0
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "gnBNcnFOnEn0QFCy",
+          "name": "Google Calendar - Juliano"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "statusCode",
+              "value": 403,
+              "type": "number"
+            },
+            {
+              "id": "s2",
+              "name": "body",
+              "value": "={{ { error: { message: \"Esta pessoa ainda não conectou a agenda Google.\" } } }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "43f68290-153c-40e7-a8c4-8817d0a9db70",
+      "name": "Sem agenda",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        448,
+        192
+      ]
+    }
+  ],
+  "connections": {
+    "Pedido": {
+      "main": [
+        [
+          {
+            "node": "Qual pessoa?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qual pessoa?": {
+      "main": [
+        [
+          {
+            "node": "Agenda - Juliano",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sem agenda",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate",
+    "errorWorkflow": "93khVPDggzbYIxrs"
+  },
+  "nodeGroups": [],
+  "tags": []
+}

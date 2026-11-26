@@ -1,50 +1,51 @@
 # Future improvements
 
-Ideas left out of v1. Each one lists the extension point that absorbs it, so none should need a rewrite.
+Ideas left out of the n8n version. Each one names the part of the system that absorbs it.
 
-## Shared household items (e.g. a shared shopping list)
+## Serving more people
 
-Extension point: the `owner` column.
+In n8n a credential is fixed on a node, so per-person Google access means one node per person. That is isolated in **Google Agenda (por pessoa)**, so the rest of the system only passes `user_key` along. Three ways to grow:
 
-Todos and preferences already carry an `owner` (`src/zacretario/models.py`). A shared owner such as `casa` can be added next to the two user numbers. The work is in the todo tools (`src/zacretario/agent/todo_tools.py`) and the prompt, so the agent can tell "my list" from "the house list", plus a rule for who may read and write shared rows. Personal data must stay isolated.
+| Path | How | Adding someone | Good for |
+|---|---|---|---|
+| **Switch per person** (current) | One rule and one HTTP Request node per person in *Google Agenda (por pessoa)* | Credential + branch + a row in `users` | Up to ~10 people |
+| **One instance per client** | Each freelance client gets their own VPS (or n8n) from [infra/](../infra/) and the exported workflows, with one user | A new instance | Client work: isolated data and costs |
+| **Tokens in the database** | A small OAuth flow of our own: a link, a webhook that stores each person's refresh token in `users`, and a Code node that refreshes it and calls Google | Send them a link | Dozens or hundreds of people on one bot |
 
-## Audio, images and forwarded messages
-
-Extension point: the channel adapter and `IncomingMessage.type`.
-
-`src/zacretario/channels/whatsapp.py` parses the Meta payload into an `IncomingMessage`, and `src/zacretario/service.py` is the single place that branches on `message.type` (anything other than text currently gets a "text only" notice). Audio would add a branch there that downloads the media and transcribes it, then hands the resulting text to the unchanged agent. Images and forwarded messages follow the same pattern.
+Only *Google Agenda (por pessoa)* changes between these paths; the agent, the prompt and the WhatsApp side stay the same.
 
 ## Proactive reminders
 
-Extension points: the tool registry and the channel adapter.
+Part: a new workflow with a **Schedule Trigger**.
 
-Sending outside a user message needs a scheduled job that calls the adapter's send function (`src/zacretario/channels/whatsapp.py`). Reminders to create or edit would be new skills registered in `src/zacretario/agent/registry.py` and imported in `src/zacretario/agent/__init__.py`, with a table for pending reminders. Outside the 24-hour customer-service window, WhatsApp requires approved message templates.
+With Evolution API there is no 24-hour window and no template approval, so a scheduled workflow can read upcoming events (through *Portão de agenda*) or a `reminders` table and send through the same Evolution request as `Enviar resposta`. A `create_reminder` tool would let the agent schedule them.
 
-## Other calendars (Outlook, iCloud)
+## Audio, images and forwarded messages
 
-Extension point: `CalendarProvider`.
+Part: `Normalizar mensagem` and the `É texto?` branch.
 
-`src/zacretario/calendar/base.py` defines the interface and `src/zacretario/calendar/google.py` is the first implementation. A new provider implements the same interface and is selected per user. The calendar tools and the agent do not change.
+Evolution API delivers media in the same `MESSAGES_UPSERT` event. Audio would get its own branch: download the media from Evolution, transcribe it, and feed the text into `Contexto` like a typed message. Images and forwards follow the same pattern.
+
+## Shared household items (e.g. a shared shopping list)
+
+Part: the `user_key` column.
+
+A shared key such as `casa` next to the personal ones, plus tools that let the agent tell "my list" from "the house list" and a rule for who may read and write shared rows. Personal data must stay isolated.
 
 ## Other channels (Telegram)
 
-Extension point: the channel adapter.
+Part: a new entry workflow.
 
-The agent takes text and returns text, and knows nothing about WhatsApp. A Telegram adapter under `src/zacretario/channels/` would parse its updates into the same `IncomingMessage` and send replies, with its own webhook route in `src/zacretario/main.py`. The allowlist would need to cover Telegram user IDs.
-
-## New skills in general
-
-Extension point: the tool registry.
-
-Each skill is a schema plus a function registered in `src/zacretario/agent/registry.py`. Add a module under `src/zacretario/agent/` and import it in `src/zacretario/agent/__init__.py`; the agent loop is untouched.
+*Agente Zacretário* takes text and returns text and knows nothing about WhatsApp. A Telegram Trigger workflow would normalise the update, look the person up in `users` (with a Telegram id column) and call the same agent.
 
 ## Housekeeping and concurrency
 
-- **Pruning old rows.** `processed_messages` and `conversation_messages` only grow. A periodic job could delete deduplication rows older than a few days and conversation rows older than the history window.
-- **Per-user serialization.** Two messages from the same user sent close together run in separate background tasks and can interleave (for example, a "yes" racing the message it confirms). A per-owner lock or queue in `src/zacretario/service.py` would process them in order.
-- **Timed event back to all-day.** `update_event` can turn an all-day event into a timed one, but not the reverse. Supporting it needs a way for the tool to say "make this all-day" (for example an `all_day` flag) and a call to `_time_field` with `clear_other`.
+- **Pruning old rows.** `processed_messages` and `conversation` only grow. A daily Schedule Trigger with one SQL statement could delete deduplication rows older than a few days and conversation rows older than 24 hours.
+- **Per-person ordering.** Two messages sent close together run as separate executions and can interleave (a "yes" racing the message it confirms). n8n's queue mode or a per-user lock row would serialise them.
+- **Timed event back to all-day.** `update_event` can turn an all-day event into a timed one, but not the reverse; it needs an `all_day` input on the tool and a branch in the `Decidir` Code node.
 
-## Observability of WhatsApp delivery
+## Observability
 
-- **Log failed deliveries.** Meta reports delivery asynchronously in `statuses` webhooks (`sent`, `delivered`, `read`, `failed` with an `errors` array). `parse_webhook` currently drops them, so a reply Meta accepted but could not deliver is invisible. Logging `failed` statuses with their error code in `src/zacretario/main.py` (or a small handler next to `parse_webhook`) would have made errors 130497 and 131037 obvious; see [meta-whatsapp-notes.md](meta-whatsapp-notes.md).
-- **Log the Graph API error body.** `WhatsAppClient.send_text` raises on a `400` without the response body, which holds `error.code` and `error.message`. Logging `response.text` before raising is a one-line change.
+- **WhatsApp session health.** A Schedule Trigger calling Evolution's `GET /instance/connectionState/zacretario` and alerting the owner (through *Erros*' pattern) when it is not `open`, before anyone notices the bot is silent.
+- **Code node tests in the repository.** The agenda Code nodes were tested with a throwaway Node.js harness (Luxon + a small `$`/`$json` stub). Committing it with a `package.json` would make the 20 cases re-runnable before every change.
+- **Workflow exports.** Exporting is manual today (n8n CLI, then scrubbing pinned data). A small script, or n8n's source-control feature on a paid plan, would keep `workflows/*.json` in sync.

@@ -116,6 +116,16 @@ Each person connects their own Google account. In n8n a credential is fixed on a
 4. **One branch per person:** in **Google Agenda (por pessoa)**, add a rule `user_key` equals `<key>` to **Qual pessoa?** and duplicate the **Agenda - Juliano** node for it, switching its credential. Until then, that person's agenda requests get "Esta pessoa ainda não conectou a agenda Google."
 5. Publish **Google Agenda (por pessoa)**, **Portão de agenda** and **Agente Zacretário** (sub-workflows run their published version).
 
-### Updating
+## Import the workflows
+
+The exported workflows are in [workflows/](../workflows/), without credentials and without pinned data.
+
+1. In n8n, import each file (Workflows → Create → Import from file), in this order: `google-agenda-por-pessoa.json`, `portao-de-agenda.json`, `erros.json`, `agente-zacretario.json`, `entrada-whatsapp.json`.
+2. Open every node that shows a credential warning and pick the matching credential (`Evolution API`, `Postgres Zacretário`, `Anthropic`, `Google Calendar - <Name>`).
+3. Workflows call each other by id, and imported workflows get new ids. Re-select the target workflow in: *Chamar Google* and *Chamar Google (2)* (Portão de agenda → Google Agenda (por pessoa)), the five calendar tools in the agent (→ Portão de agenda), and *Chamar Agente* (Entrada Whatsapp → Agente Zacretário). Set **Erros** as the *Error workflow* in the settings of the other four.
+4. In **Erros**, set `owner_key` in *Configuração* to the owner's `users.key`; in **Google Agenda (por pessoa)**, keep one Switch rule and one HTTP node per person (see [Google Calendar](#google-calendar)).
+5. Publish **Erros** first, then the sub-workflows, then **Entrada Whatsapp** last.
+
+## Updating
 
 Images are pinned. To update one, change its tag in `infra/docker-compose.yml`, copy the file to the server, and run `docker compose pull <service> && docker compose up -d <service>`. Read the release notes first, especially for Evolution API.

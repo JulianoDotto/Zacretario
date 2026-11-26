@@ -2,9 +2,9 @@
 
 # Zacretário
 
-A personal secretary that lives in a WhatsApp chat. Write in plain language, and a Claude tool-use agent files the appointment in Google Calendar or adds the task to your to-do list.
+A personal secretary that lives in a WhatsApp chat. Write in plain language, and a Claude agent running in **n8n** files the appointment in Google Calendar or adds the task to your to-do list.
 
-This project is also a portfolio piece with one message: **I can use AI to build software and solutions.** AI is inside the product (an agent with tools) and in the process (designed, planned and implemented with Claude Code; see [How it was built](#how-it-was-built)).
+This project is also a portfolio piece with one message: **I can use AI to build software and solutions.** It exists in two versions: first as a Python/FastAPI app (tag [`v1-python`](../../tree/v1-python)), then rebuilt as self-hosted n8n workflows, which is what this branch contains. Both were designed, planned and built with Claude Code; see [How it was built](#how-it-was-built).
 
 ## Example
 
@@ -35,107 +35,86 @@ Bot:  🗑️ Dentista cancelado.
 ## Features
 
 - Free-text messages, no command syntax. Messages with a day or time become calendar events; the rest become to-dos.
-- Calendar: create, list, update (reschedule) and cancel events, and find free slots ("I need 2h to study this week" proposes times and only books after you approve).
-- To-dos: add, list, complete and delete.
-- Preferences, such as working hours and blocked weekdays, used when proposing slots.
-- Asks before anything destructive or ambiguous, and every reply states what was understood.
-- Short per-user conversation memory, so "yes" and "the second option" work.
-- Allowlist of phone numbers, webhook signature check, duplicate-message protection.
-- Text only: other message types get a polite notice. Out-of-scope requests ("write a poem") are refused.
+- Calendar: create, list, reschedule and cancel events, and find free slots ("I need 2h to study this week" proposes times and only books after you approve).
+- To-dos: add, list, complete and delete. Preferences such as working hours and blocked weekdays.
+- Asks before anything destructive; events with guests or organised by someone else are read-only.
+- Each person has their own data, their own Google account and their own short conversation history.
+- Only allowlisted numbers get an answer; duplicate deliveries are processed once; the bot ignores its own messages and groups.
+- When something fails, the person gets a polite reply and the owner gets a WhatsApp alert with the failing workflow and node.
+- Out-of-scope requests ("write a poem") are refused.
 
 ## How it works
 
 ```
-WhatsApp ──► Meta Cloud API ──► POST /webhook (FastAPI)
-                                   │ verify signature, answer 200,
-                                   │ drop duplicates and unknown numbers
-                                   ▼
-                              background task
-                                   │ load recent conversation
-                                   ▼
-                          Agent (Claude + tools)
-                          ├─ calendar tools ───► Google Calendar
-                          ├─ todo tools ───────► Postgres
-                          └─ preference tools ─► Postgres
-                                   │
-                                   ▼
-WhatsApp ◄── Meta Cloud API ◄── reply
+WhatsApp ──► Evolution API ──► n8n ─ Entrada Whatsapp
+              (same VPS,        │  normalise, ignore own/group messages,
+               internal network)│  drop duplicates, look the sender up in `users`
+                                ▼
+                       Agente Zacretário (AI Agent, Claude)
+                       ├─ to-do and preference tools ──► Postgres
+                       └─ calendar tools ─► Portão de agenda (logic, no credentials)
+                                              └─► Google Agenda (por pessoa)
+                                                   one HTTP node per person ──► Google Calendar
+                                ▼
+WhatsApp ◄── Evolution API ◄── reply           Erros ── alerts the owner on any failure
 ```
 
-The agent receives text and returns text; WhatsApp is just an adapter. Skills are registered in one place, so adding one does not touch the agent loop. See [docs/future-improvements.md](docs/future-improvements.md) for the extension points.
+Five workflows, exported in [workflows/](workflows/):
+
+| Workflow | Role |
+|---|---|
+| **Entrada Whatsapp** | Webhook from Evolution API; filters, deduplication, allowlist; calls the agent; sends the reply |
+| **Agente Zacretário** | AI Agent with Claude, text-only history and 11 tools |
+| **Portão de agenda** | Calendar logic in Code nodes: builds Google Calendar API requests, read-only check, free slots |
+| **Google Agenda (por pessoa)** | The only place with Google credentials: a Switch on the person |
+| **Erros** | Error workflow for all the others |
+
+Everything that changes per person or per client lives in the `users` table and in n8n credentials, never inside the nodes. See [docs/future-improvements.md](docs/future-improvements.md#serving-more-people) for how this scales.
 
 ## Tech stack
 
-- Python 3.12, [uv](https://docs.astral.sh/uv/)
-- FastAPI and uvicorn
-- Anthropic API (Claude, tool use)
-- Google Calendar API (OAuth per user)
-- PostgreSQL ([Neon](https://neon.tech)), SQLAlchemy 2, Alembic
-- WhatsApp Cloud API (Meta)
-- pytest
+- [n8n](https://n8n.io) 2.x, self-hosted, with JavaScript Code nodes (Luxon for dates)
+- Anthropic Claude (`claude-sonnet-5-5`) through n8n's AI Agent
+- [Evolution API](https://github.com/EvolutionAPI/evolution-api) v2.3 for WhatsApp
+- Google Calendar API (OAuth per person)
+- PostgreSQL 16, Caddy 2 (HTTPS), Docker Compose on one VPS
+
+> **Unofficial WhatsApp integration.** Evolution API is not Meta's official API; using it goes against WhatsApp's Terms of Service and the number can be banned. Zacretário uses a dedicated number and only answers people who write to it. [Why not the official API?](docs/why-n8n-evolution.md)
 
 ## Getting started
 
-Follow [docs/local-setup.md](docs/local-setup.md) in order:
+Follow [docs/setup.md](docs/setup.md) in order: VPS and n8n, WhatsApp (Evolution API), database and users, Google Calendar. Then import the workflows from [workflows/](workflows/) as described in [Import the workflows](docs/setup.md#import-the-workflows).
 
-1. [Docker (test database)](docs/local-setup.md#docker-test-database)
-2. [Neon (database)](docs/local-setup.md#neon-database)
-3. [Google Cloud (Calendar)](docs/local-setup.md#google-cloud-calendar)
-4. [Meta / WhatsApp](docs/local-setup.md#meta--whatsapp), with the lessons from the first real setup in [docs/meta-whatsapp-notes.md](docs/meta-whatsapp-notes.md)
-5. [Running locally with a tunnel](docs/local-setup.md#running-locally-with-a-tunnel)
-6. [Acceptance checklist](docs/local-setup.md#acceptance-checklist)
-
-For a permanent server, domain and HTTPS, see [docs/deploy.md](docs/deploy.md).
-
-Configuration lives in `.env` (copy `.env.example`). Secrets, tokens and phone numbers never go in the repository.
-
-## Running tests
-
-```bash
-uv run pytest        # on Windows without uv on PATH: python -m uv run pytest
-```
-
-Tests use in-memory SQLite by default. To run them against Postgres:
-
-```bash
-docker compose up -d db
-export TEST_DATABASE_URL=postgresql+psycopg://zacretario:zacretario@localhost:5433/zacretario_test
-uv run pytest
-```
-
-A Neon branch works the same way: set `TEST_DATABASE_URL` to its connection string.
-
-`TEST_DATABASE_URL` must be exported in the shell: the tests read `os.environ`, not `.env`. Never point it at your production database, because the tests drop all tables.
+Secrets live only in `infra/.env` on the server and in n8n's encrypted credentials. Phone numbers are never committed.
 
 ## Project structure
 
 ```
-src/zacretario/
-  main.py            FastAPI app and webhook routes
-  service.py         message handling: allowlist, dedup, message types
-  config.py          settings from environment variables
-  channels/          WhatsApp adapter (payload parsing, sending)
-  agent/             Claude loop, system prompt, tool registry and skills
-  calendar/          CalendarProvider interface and Google implementation
-  repositories/      database access (todos, preferences, conversation, credentials)
-  scheduling.py      free-slot computation
-migrations/          Alembic migrations
-scripts/             one-time Google authorization
-tests/               mirrors src/
-docs/                setup guide, future improvements, spec and plan
+infra/               docker-compose.yml, Caddyfile, Postgres init, SQL schema
+workflows/           exported n8n workflows (JSON)
+  code/              source of every Code node
+  fixtures/          anonymised Evolution API payload
+  prompt.md          the agent's system prompt
+  tools.md           the agent's database tools
+docs/
+  setup.md           install guide, from an empty VPS
+  why-n8n-evolution.md
+  learning-log.md    what each stage taught, and what went wrong
+  future-improvements.md
+  superpowers/       design specs and implementation plans
 ```
 
 ## How it was built
 
-Zacretário was built with AI end to end:
+Both versions followed the same AI-assisted process with Claude Code:
 
-1. **Brainstorm** with Claude Code to turn the idea into requirements and decisions.
-2. **Design spec**: [docs/superpowers/specs/2026-11-24-zacretario-design.md](docs/superpowers/specs/2026-11-24-zacretario-design.md) (in Portuguese).
-3. **Implementation plan**: [docs/superpowers/plans/2026-11-24-zacretario.md](docs/superpowers/plans/2026-11-24-zacretario.md), broken into small tasks.
-4. **Implementation** task by task by Claude Code subagents, each task independently reviewed before moving on.
+1. **Brainstorm** to turn the idea into requirements and decisions.
+2. **Design spec**: [v1](docs/superpowers/specs/2026-11-24-zacretario-design.md), [n8n](docs/superpowers/specs/2026-11-25-n8n-migration-design.md) (in Portuguese).
+3. **Implementation plan**: [v1](docs/superpowers/plans/2026-11-24-zacretario.md), [n8n](docs/superpowers/plans/2026-11-25-n8n-migration.md).
+4. **Implementation.** v1 was written by Claude Code subagents, each task reviewed before the next. The n8n version was built as a guided walkthrough: Claude navigated the browser and explained each step, and I built the workflows myself in the n8n editor, with Claude writing the Code nodes and some nodes through n8n's MCP server when I asked it to.
 
-The spec and plan are versioned here as evidence of the process.
+[docs/learning-log.md](docs/learning-log.md) records each stage of the n8n build: what was done, the n8n concept behind it, and what went wrong (including a memory bug with Claude's signed thinking blocks that only showed up in long conversations).
 
 ## Scope note
 
-Meta's WhatsApp Business terms prohibit general-purpose AI chatbots on the API, but allow task-specific assistants. Zacretário is deliberately a calendar and to-do secretary: its system prompt limits it to those skills and politely declines anything else. This is a product requirement as well as a compliance one.
+Zacretário is deliberately a calendar and to-do secretary: its system prompt limits it to those skills and politely declines anything else.
