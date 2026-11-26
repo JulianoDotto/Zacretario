@@ -125,3 +125,10 @@ Observações:
 - **T08 ❌:** em "de manhã", passou `earliest_time` 06:00 e propôs horários às 6h, ignorando a janela 08:00–22:00 da pessoa. O Sonnet respeitou a janela.
 - Formato: ao criar evento, às vezes sem o 📅 (T02, T04); no T08 usou 🏃 no lugar de 📅; o T01 não separou agenda e TODOs em blocos com 📅/✅.
 - No resto, respostas certas e curtas.
+
+**Fase 2b: Haiku 5.5 + prompt ajustado (26/11).** Foram duas regras novas no prompt da cópia. (1) `earliest_time`/`latest_time` só podem estreitar a janela das preferências. (2) Usar 📅 também nas confirmações e nas propostas de horário. Reteste dos afetados:
+- **T01 ✅:** agenda e TODOs, cada um numa linha (os dois vazios).
+- **T02 ✅:** agora com "📅 *Dentista* – sex 27/11 15:00–16:00".
+- **T08 ✅ na regra que importa:** propôs 08:00–09:00, dentro da janela. Formato ainda imperfeito: marcou os horários com ✅ em vez de 📅.
+
+Custo dos três: 29.551 tokens de entrada e 970 de saída, ≈ US$ 0,0034.
