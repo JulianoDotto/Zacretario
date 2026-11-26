@@ -24,7 +24,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "// n8n Code node \"Normalizar mensagem\" — mode: Run Once for Each Item.\n// Turns the Evolution API MESSAGES_UPSERT webhook into the few fields the\n// rest of the workflow needs. Payload sample: workflows/fixtures/messages-upsert-texto.json\n\nconst body = $json.body ?? {};\nconst data = body.data ?? {};\nconst key = data.key ?? {};\nconst message = data.message ?? {};\n\n// WhatsApp is moving senders to \"@lid\" ids. Prefer the phone JID when either\n// field carries one; otherwise keep the raw id so it can still be allowlisted.\nconst jids = [key.remoteJid, key.remoteJidAlt].filter(Boolean);\nconst phoneJid = jids.find((jid) => jid.endsWith('@s.whatsapp.net'));\nconst sender = phoneJid ? phoneJid.split('@')[0] : (key.remoteJid ?? '');\n\nconst rawText = message.conversation ?? message.extendedTextMessage?.text ?? null;\nconst text = typeof rawText === 'string' && rawText.trim() !== '' ? rawText.trim() : null;\n\nreturn {\n  json: {\n    isMessageEvent: body.event === 'messages.upsert',\n    messageId: key.id ?? '',\n    chatId: key.remoteJid ?? '', // reply exactly where the message came from\n    sender,\n    text,\n    fromMe: key.fromMe === true,\n    isGroup: (key.remoteJid ?? '').endsWith('@g.us'),\n    isText: text !== null,\n  },\n};\n"
+        "jsCode": "// n8n Code node \"Normalizar mensagem\" — mode: Run Once for Each Item.\n// Turns the Evolution API MESSAGES_UPSERT webhook into the few fields the\n// rest of the workflow needs. Payload sample: workflows/fixtures/messages-upsert-texto.json\n\n// Media the bot cannot read yet: these get the \"text only\" notice.\nconst MEDIA_TYPES = new Set([\n  'imageMessage', 'audioMessage', 'videoMessage', 'documentMessage', 'documentWithCaptionMessage',\n  'stickerMessage', 'locationMessage', 'liveLocationMessage', 'contactMessage', 'contactsArrayMessage',\n  'ptvMessage',\n]);\n\nconst body = $json.body ?? {};\nconst data = body.data ?? {};\nconst key = data.key ?? {};\n\n// Disappearing and view-once messages wrap the real message one level down.\nlet message = data.message ?? {};\nfor (const wrapper of ['ephemeralMessage', 'viewOnceMessage', 'viewOnceMessageV2']) {\n  if (message[wrapper]?.message) message = message[wrapper].message;\n}\n\n// WhatsApp is moving senders to \"@lid\" ids. Prefer the phone JID when either\n// field carries one; otherwise keep the raw id so it can still be allowlisted.\nconst jids = [key.remoteJid, key.remoteJidAlt].filter(Boolean);\nconst phoneJid = jids.find((jid) => jid.endsWith('@s.whatsapp.net'));\nconst sender = phoneJid ? phoneJid.split('@')[0] : (key.remoteJid ?? '');\n\nconst rawText = message.conversation ?? message.extendedTextMessage?.text ?? null;\nconst text = typeof rawText === 'string' && rawText.trim() !== '' ? rawText.trim() : null;\nconst isText = text !== null;\nconst isMedia = !isText && Object.keys(message).some((type) => MEDIA_TYPES.has(type));\n\nreturn {\n  json: {\n    isMessageEvent: body.event === 'messages.upsert',\n    messageId: key.id ?? '',\n    chatId: key.remoteJid ?? '', // reply exactly where the message came from\n    sender,\n    text,\n    fromMe: key.fromMe === true,\n    isGroup: (key.remoteJid ?? '').endsWith('@g.us'),\n    isText,\n    // Reactions, edits, deletions, poll votes and other events: no reply at all.\n    ignore: !isText && !isMedia,\n  },\n};\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -68,6 +68,16 @@
             {
               "id": "c2cca37f-3684-4e6c-8f05-0255f085fd5a",
               "leftValue": "={{ $json.isGroup }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "d4e5f6a7-0000-4000-8000-000000000004",
+              "leftValue": "={{ $json.ignore }}",
               "rightValue": false,
               "operator": {
                 "type": "boolean",

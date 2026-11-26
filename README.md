@@ -83,7 +83,7 @@ Everything that changes per person or per client lives in the `users` table and 
 
 ## Getting started
 
-Follow [docs/setup.md](docs/setup.md) in order: VPS and n8n, WhatsApp (Evolution API), database and users, Google Calendar. Then import the workflows from [workflows/](workflows/) as described in [Import the workflows](docs/setup.md#import-the-workflows).
+Follow [docs/setup.md](docs/setup.md) top to bottom: VPS and n8n, WhatsApp (Evolution API), database, Anthropic, Google Calendar, importing the workflows from [workflows/](workflows/), and adding people.
 
 Secrets live only in `infra/.env` on the server and in n8n's encrypted credentials. Phone numbers are never committed.
 
