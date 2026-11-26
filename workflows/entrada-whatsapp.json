@@ -1,0 +1,731 @@
+{
+  "id": "3WiPqnIidf8vVDct",
+  "name": "Entrada Whatsapp",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-entrada",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        -96
+      ],
+      "id": "277fed7c-026c-4679-9ffb-a4c13d2133a0",
+      "name": "Webhook",
+      "webhookId": "4e748fb6-200f-4ab2-86c0-8fa019420d84"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// n8n Code node \"Normalizar mensagem\" — mode: Run Once for Each Item.\n// Turns the Evolution API MESSAGES_UPSERT webhook into the few fields the\n// rest of the workflow needs. Payload sample: workflows/fixtures/messages-upsert-texto.json\n\n// Media the bot cannot read yet: these get the \"text only\" notice.\nconst MEDIA_TYPES = new Set([\n  'imageMessage', 'audioMessage', 'videoMessage', 'documentMessage', 'documentWithCaptionMessage',\n  'stickerMessage', 'locationMessage', 'liveLocationMessage', 'contactMessage', 'contactsArrayMessage',\n  'ptvMessage',\n]);\n\nconst body = $json.body ?? {};\nconst data = body.data ?? {};\nconst key = data.key ?? {};\n\n// Disappearing and view-once messages wrap the real message one level down.\nlet message = data.message ?? {};\nfor (const wrapper of ['ephemeralMessage', 'viewOnceMessage', 'viewOnceMessageV2']) {\n  if (message[wrapper]?.message) message = message[wrapper].message;\n}\n\n// WhatsApp is moving senders to \"@lid\" ids. Prefer the phone JID when either\n// field carries one; otherwise keep the raw id so it can still be allowlisted.\nconst jids = [key.remoteJid, key.remoteJidAlt].filter(Boolean);\nconst phoneJid = jids.find((jid) => jid.endsWith('@s.whatsapp.net'));\nconst sender = phoneJid ? phoneJid.split('@')[0] : (key.remoteJid ?? '');\n\nconst rawText = message.conversation ?? message.extendedTextMessage?.text ?? null;\nconst text = typeof rawText === 'string' && rawText.trim() !== '' ? rawText.trim() : null;\nconst isText = text !== null;\nconst isMedia = !isText && Object.keys(message).some((type) => MEDIA_TYPES.has(type));\n\nreturn {\n  json: {\n    isMessageEvent: body.event === 'messages.upsert',\n    messageId: key.id ?? '',\n    chatId: key.remoteJid ?? '', // reply exactly where the message came from\n    sender,\n    text,\n    fromMe: key.fromMe === true,\n    isGroup: (key.remoteJid ?? '').endsWith('@g.us'),\n    isText,\n    // Reactions, edits, deletions, poll votes and other events: no reply at all.\n    ignore: !isText && !isMedia,\n  },\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        -96
+      ],
+      "id": "2a560199-c149-4040-8452-f619ccaefc82",
+      "name": "Normalizar mensagem"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "f4c01e72-e7de-40da-9a30-49fb6ce692e7",
+              "leftValue": "={{ $json.isMessageEvent }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "a3c7119e-9aa3-4dd9-8163-a1620f19fb5f",
+              "leftValue": "={{ $json.fromMe }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "c2cca37f-3684-4e6c-8f05-0255f085fd5a",
+              "leftValue": "={{ $json.isGroup }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "d4e5f6a7-0000-4000-8000-000000000004",
+              "leftValue": "={{ $json.ignore }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        448,
+        -96
+      ],
+      "id": "46f14b8c-4c13-43d7-89a0-a351b9c60f93",
+      "name": "Deve Responder?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "85a5c229-473a-49b2-bfe3-1dc507eab561",
+              "leftValue": "={{ $json.isText }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1792,
+        -192
+      ],
+      "id": "7e1659d6-10d4-4488-a47b-dcdf7f601579",
+      "name": "É texto?"
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n Code node \"Dividir mensagem\" — mode: Run Once for All Items.\n// Splits a long reply into parts of at most LIMIT characters, breaking on line\n// boundaries when possible (a single line longer than LIMIT is cut in chunks).\n// Input items: { text, chatId }. Output: one item per part: { part, chatId }.\n\nconst LIMIT = 4096;\n\nfunction splitMessage(text, limit = LIMIT) {\n  const parts = [];\n  let current = null; // null = no open part (different from an empty line)\n  for (const line of text.split('\\n')) {\n    if (line.length > limit) {\n      if (current !== null) parts.push(current);\n      const chunks = [];\n      for (let i = 0; i < line.length; i += limit) chunks.push(line.slice(i, i + limit));\n      parts.push(...chunks.slice(0, -1));\n      current = chunks[chunks.length - 1];\n    } else if (current === null) {\n      current = line;\n    } else if (current.length + 1 + line.length <= limit) {\n      current += '\\n' + line;\n    } else {\n      parts.push(current);\n      current = line;\n    }\n  }\n  if (current !== null) parts.push(current);\n  return parts.filter((part) => part.trim() !== '');\n}\n\nconst out = [];\nfor (const item of $input.all()) {\n  for (const part of splitMessage(item.json.text ?? '')) {\n    out.push({ json: { part, chatId: item.json.chatId } });\n  }\n}\nreturn out;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        -288
+      ],
+      "id": "dd544ed2-f2ee-46b4-adad-567f4b496acd",
+      "name": "Dividir mensagem"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://evolution:8080/message/sendText/zacretario",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "=number",
+              "value": "={{ $json.chatId }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.part }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2688,
+        -288
+      ],
+      "id": "64ae0b59-47f5-4e8e-aa9f-27a35de51285",
+      "name": "Enviar resposta",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "NpMON9VoF8ia9dwU",
+          "name": "Evolution API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://evolution:8080/message/sendText/zacretario",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "=number",
+              "value": "={{ $json.chatId }}"
+            },
+            {
+              "name": "text",
+              "value": "=Por enquanto eu só entendo mensagens de texto 🙂"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2016,
+        64
+      ],
+      "id": "60daa256-8746-4656-aee8-96ee7cb21b13",
+      "name": "Avisar só texto",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "NpMON9VoF8ia9dwU",
+          "name": "Evolution API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO processed_messages (message_id) VALUES ($1) ON CONFLICT DO NOTHING RETURNING message_id",
+        "options": {
+          "queryReplacement": "={{ $json.messageId }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.8,
+      "position": [
+        672,
+        -96
+      ],
+      "id": "a4a55277-51ca-414d-ac85-fb6d5c282e54",
+      "name": "Marcar como processada",
+      "credentials": {
+        "postgres": {
+          "id": "5m9yHkKV7JeOd48c",
+          "name": "Postgres Zacretário"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "2f0d5e18-a76e-43c9-bc74-5e8a11f3413e",
+              "leftValue": "={{ $json.message_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        896,
+        -96
+      ],
+      "id": "4664d743-5797-4576-8fad-e36b022f83fa",
+      "name": "É nova?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT key, name, calendar_id, timezone FROM users WHERE whatsapp_id = $1 AND active",
+        "options": {
+          "queryReplacement": "={{ $('Normalizar mensagem').item.json.sender }}"
+        }
+      },
+      "id": "77aa5b02-a250-441c-98f8-6f6aa198dbec",
+      "name": "Buscar usuário",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.8,
+      "position": [
+        1120,
+        -96
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "5m9yHkKV7JeOd48c",
+          "name": "Postgres Zacretário"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "6b1f0a2e-1c3d-4e5f-8a9b-0c1d2e3f4a5b",
+              "leftValue": "={{ $json.key }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2af2d915-6244-48a3-8e08-b71a210a812d",
+      "name": "Usuário conhecido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1344,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "user_key",
+              "value": "={{ $json.key }}",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "name",
+              "value": "={{ $json.name }}",
+              "type": "string"
+            },
+            {
+              "id": "a3",
+              "name": "timezone",
+              "value": "={{ $json.timezone }}",
+              "type": "string"
+            },
+            {
+              "id": "a4",
+              "name": "calendar_id",
+              "value": "={{ $json.calendar_id }}",
+              "type": "string"
+            },
+            {
+              "id": "a5",
+              "name": "messageId",
+              "value": "={{ $('Normalizar mensagem').item.json.messageId }}",
+              "type": "string"
+            },
+            {
+              "id": "a6",
+              "name": "chatId",
+              "value": "={{ $('Normalizar mensagem').item.json.chatId }}",
+              "type": "string"
+            },
+            {
+              "id": "a7",
+              "name": "text",
+              "value": "={{ $('Normalizar mensagem').item.json.text }}",
+              "type": "string"
+            },
+            {
+              "id": "a8",
+              "name": "isText",
+              "value": "={{ $('Normalizar mensagem').item.json.isText }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "35fe2ea6-dcd0-4381-bdbd-f56333e9b4f6",
+      "name": "Contexto",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1568,
+        -192
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b1",
+              "name": "sender",
+              "value": "={{ $('Normalizar mensagem').item.json.sender }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f8e759cc-9f11-4c19-b017-7accd9123703",
+      "name": "Número desconhecido",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1568,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "puG82ODOo7Idv90U",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/puG82ODOo7Idv90U",
+          "cachedResultName": "Agente Zacretário"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "user_key": "={{ $json.user_key }}",
+            "name": "={{ $json.name }}",
+            "timezone": "={{ $json.timezone }}",
+            "text": "={{ $json.text }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "user_key",
+              "displayName": "user_key",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "timezone",
+              "displayName": "timezone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "text",
+              "displayName": "text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        2016,
+        -288
+      ],
+      "id": "17b714ad-2afe-4965-a55d-c2437ffc0df8",
+      "name": "Chamar Agente",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "07b61787-e4d7-4385-b90f-44d1a0847ae4",
+              "name": "text",
+              "value": "={{ $json.output }}",
+              "type": "string"
+            },
+            {
+              "id": "fb0e7ef5-7515-4231-ad5e-d0e395727d97",
+              "name": "chatId",
+              "value": "={{ $('Contexto').item.json.chatId }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        2240,
+        -288
+      ],
+      "id": "9ecb8476-d238-47ed-a2c1-d8a58d70adb2",
+      "name": "Resposta"
+    },
+    {
+      "id": "b161249b-87fe-46e7-bed9-e25d9b66fb0b",
+      "name": "Avisar falha",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2240,
+        -96
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://evolution:8080/message/sendText/zacretario",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $('Contexto').item.json.chatId }}"
+            },
+            {
+              "name": "text",
+              "value": "Tive um problema agora, tenta de novo em instantes."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "NpMON9VoF8ia9dwU",
+          "name": "Evolution API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalizar mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar mensagem": {
+      "main": [
+        [
+          {
+            "node": "Deve Responder?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deve Responder?": {
+      "main": [
+        [
+          {
+            "node": "Marcar como processada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "É texto?": {
+      "main": [
+        [
+          {
+            "node": "Chamar Agente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Avisar só texto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dividir mensagem": {
+      "main": [
+        [
+          {
+            "node": "Enviar resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar como processada": {
+      "main": [
+        [
+          {
+            "node": "É nova?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "É nova?": {
+      "main": [
+        [
+          {
+            "node": "Buscar usuário",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar usuário": {
+      "main": [
+        [
+          {
+            "node": "Usuário conhecido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Usuário conhecido?": {
+      "main": [
+        [
+          {
+            "node": "Contexto",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Número desconhecido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contexto": {
+      "main": [
+        [
+          {
+            "node": "É texto?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chamar Agente": {
+      "main": [
+        [
+          {
+            "node": "Resposta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Avisar falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resposta": {
+      "main": [
+        [
+          {
+            "node": "Dividir mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true,
+    "errorWorkflow": "93khVPDggzbYIxrs"
+  },
+  "nodeGroups": [],
+  "tags": []
+}

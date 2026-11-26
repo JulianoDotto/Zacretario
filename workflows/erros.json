@@ -1,0 +1,144 @@
+{
+  "id": "93khVPDggzbYIxrs",
+  "name": "Erros",
+  "description": "Error workflow central: quando outro workflow falha em produção, avisa o dono (users.key em Configuração) pelo WhatsApp.",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "4917a139-336a-484b-9365-0feb4b1a6c6b",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "4630e27a-a9c0-4da7-82d4-4c8fbb67f7e9",
+      "name": "Configuração",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1",
+              "name": "owner_key",
+              "value": "juliano",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "33148638-2f2f-4462-8a8c-2bc3784746a4",
+      "name": "Buscar dono",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT whatsapp_id FROM users WHERE key = $1",
+        "options": {
+          "queryReplacement": "={{ $json.owner_key }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "5m9yHkKV7JeOd48c",
+          "name": "Postgres Zacretário"
+        }
+      }
+    },
+    {
+      "id": "34316629-a64d-42e8-9421-d8086399750e",
+      "name": "Avisar dono",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://evolution:8080/message/sendText/zacretario",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $json.whatsapp_id }}"
+            },
+            {
+              "name": "text",
+              "value": "=⚠️ Zacretário falhou em *{{ $('Error Trigger').item.json.workflow.name }}* / {{ $('Error Trigger').item.json.execution.lastNodeExecuted }}\n{{ $('Error Trigger').item.json.execution.error.message }}\nExecução {{ $('Error Trigger').item.json.execution.id }}: veja em Executions."
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "NpMON9VoF8ia9dwU",
+          "name": "Evolution API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Configuração",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuração": {
+      "main": [
+        [
+          {
+            "node": "Buscar dono",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar dono": {
+      "main": [
+        [
+          {
+            "node": "Avisar dono",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "nodeGroups": [],
+  "tags": []
+}

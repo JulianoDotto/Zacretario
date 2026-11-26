@@ -1,6 +1,8 @@
 # Meta / WhatsApp: what actually happened
 
-The steps in [local-setup.md](local-setup.md#meta--whatsapp) are the happy path. This page records what the first real setup ran into (November 2026), in the order it happened, so the next attempt (or the next reader) does not lose an afternoon to the same walls.
+> **Historical.** These notes are from v1 (tag `v1-python`), which used Meta's official Cloud API. The project now uses Evolution API; [why-n8n-evolution.md](why-n8n-evolution.md) explains the switch, and these notes are the evidence behind it. Links to `local-setup.md` point to the v1 tag.
+
+The steps in [local-setup.md](../../../blob/v1-python/docs/local-setup.md#meta--whatsapp) are the happy path. This page records what the first real setup ran into (November 2026), in the order it happened, so the next attempt (or the next reader) does not lose an afternoon to the same walls.
 
 Each item has the **symptom**, the **cause** and the **fix**. Error codes are the ones the Graph API returned.
 
@@ -59,7 +61,7 @@ Logging both permanently is listed in [future-improvements.md](future-improvemen
 
 - The **temporary access token** from *API Setup* lasts 24 hours and belongs to the test number's WABA. When you register a production number, generate the **permanent token** offered on that page (or a System User token) and put it in `WHATSAPP_ACCESS_TOKEN`.
 - Each registered number has its own **Phone number ID**; update `WHATSAPP_PHONE_NUMBER_ID` and restart.
-- The quick `cloudflared` tunnel URL changes on every restart; update the webhook callback URL in Meta when it does. A fixed domain on the VPS removes this ([deploy.md](deploy.md)).
+- The quick `cloudflared` tunnel URL changes on every restart; update the webhook callback URL in Meta when it does. A fixed domain on the VPS removes this ([deploy.md](../../../blob/v1-python/docs/deploy.md)).
 
 ## Things you do not need
 

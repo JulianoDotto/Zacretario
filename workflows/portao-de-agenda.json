@@ -1,0 +1,460 @@
+{
+  "id": "EjM0rSdJ3ZA0IrEJ",
+  "name": "Portão de agenda",
+  "description": "Lógica da agenda (sem credenciais): monta a chamada à API do Google conforme a operação, recusa mexer em eventos de outras pessoas, calcula horários livres e resume para o agente.",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "d218bfbc-7d3b-4a91-a3c7-501f29132d4e",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "user_key",
+              "type": "string"
+            },
+            {
+              "name": "operation",
+              "type": "string"
+            },
+            {
+              "name": "title",
+              "type": "string"
+            },
+            {
+              "name": "date",
+              "type": "string"
+            },
+            {
+              "name": "start_time",
+              "type": "string"
+            },
+            {
+              "name": "end_time",
+              "type": "string"
+            },
+            {
+              "name": "event_id",
+              "type": "string"
+            },
+            {
+              "name": "start_date",
+              "type": "string"
+            },
+            {
+              "name": "end_date",
+              "type": "string"
+            },
+            {
+              "name": "duration_minutes",
+              "type": "string"
+            },
+            {
+              "name": "earliest_time",
+              "type": "string"
+            },
+            {
+              "name": "latest_time",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a5331252-32d8-478e-a6e3-33cad5b8c73b",
+      "name": "Ler usuário",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT u.calendar_id, u.timezone, to_char(p.day_start, 'HH24:MI') AS day_start, to_char(p.day_end, 'HH24:MI') AS day_end, COALESCE(p.blocked_weekdays, '{}') AS blocked_weekdays FROM users u LEFT JOIN preferences p ON p.user_key = u.key WHERE u.key = $1",
+        "options": {
+          "queryReplacement": "={{ $('When Executed by Another Workflow').item.json.user_key }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "5m9yHkKV7JeOd48c",
+          "name": "Postgres Zacretário"
+        }
+      }
+    },
+    {
+      "id": "5d5c05e3-b323-4a47-9236-7acd46824f79",
+      "name": "Planejar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// n8n Code node \"Planejar\" (Portão de agenda) — mode: Run Once for Each Item.\n// Turns one agenda operation into the first Google Calendar API request.\n// Input: the trigger item { user_key, operation, title, date, start_time, end_time,\n//   event_id, start_date, end_date, duration_minutes, earliest_time, latest_time }\n//   plus the person's row from \"Ler usuário\" (calendar_id, timezone).\n// Output: { operation, args, tz, calendarId, request: { method, url, query, body } }\n//   or { done: true, result } when the input is invalid.\n// Ported from src/zacretario/agent/calendar_tools.py (tag v1-python).\n\nconst args = $('When Executed by Another Workflow').item.json;\nconst user = $('Ler usuário').item.json;\nconst tz = user.timezone || 'America/Sao_Paulo';\nconst calendarId = user.calendar_id || 'primary';\nconst base = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`;\n\nconst fail = (message) => ({ json: { done: true, result: `Erro: ${message}` } });\nconst blank = (value) => value === undefined || value === null || String(value).trim() === '';\n\nfunction parseDate(text) {\n  const day = DateTime.fromISO(String(text).trim(), { zone: tz });\n  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(String(text).trim()) || !day.isValid) {\n    throw new Error(`Data inválida: \"${text}\" (use AAAA-MM-DD)`);\n  }\n  return day.startOf('day');\n}\n\nfunction parseTime(text) {\n  const match = /^(\\d{1,2}):(\\d{2})$/.exec(String(text).trim());\n  if (!match || Number(match[1]) > 23 || Number(match[2]) > 59) {\n    throw new Error(`Hora inválida: \"${text}\" (use HH:MM)`);\n  }\n  return { hour: Number(match[1]), minute: Number(match[2]) };\n}\n\n// No end means one hour; an end at or before the start means the next day.\nfunction timedRange(day, startTime, endTime) {\n  const start = day.set(startTime);\n  if (!endTime) return [start, start.plus({ hours: 1 })];\n  let end = day.set(endTime);\n  if (end <= start) end = end.plus({ days: 1 });\n  return [start, end];\n}\n\nconst listRequest = (from, to) => ({\n  method: 'GET',\n  url: base,\n  query: {\n    timeMin: from.toISO(),\n    timeMax: to.toISO(),\n    singleEvents: 'true',\n    orderBy: 'startTime',\n    maxResults: '250',\n  },\n  body: {},\n});\n\nlet request;\ntry {\n  switch (args.operation) {\n    case 'create': {\n      if (blank(args.title)) throw new Error('Informe o título do evento.');\n      const day = parseDate(args.date);\n      let start;\n      let end;\n      if (blank(args.start_time)) {\n        start = { date: day.toISODate() };\n        end = { date: day.plus({ days: 1 }).toISODate() };\n      } else {\n        const range = timedRange(\n          day,\n          parseTime(args.start_time),\n          blank(args.end_time) ? null : parseTime(args.end_time),\n        );\n        start = { dateTime: range[0].toISO(), timeZone: tz };\n        end = { dateTime: range[1].toISO(), timeZone: tz };\n      }\n      request = {\n        method: 'POST',\n        url: base,\n        query: { sendUpdates: 'none' },\n        body: {\n          summary: args.title,\n          start,\n          end,\n          extendedProperties: { private: { zacretario: 'true' } },\n        },\n      };\n      break;\n    }\n    case 'list': {\n      const from = parseDate(args.start_date);\n      const to = parseDate(args.end_date).plus({ days: 1 });\n      request = listRequest(from, to);\n      break;\n    }\n    case 'update':\n    case 'delete': {\n      if (blank(args.event_id)) throw new Error('Informe o id do evento (use list_events).');\n      // First fetch the event: we need its times and must check who organised it.\n      request = { method: 'GET', url: `${base}/${encodeURIComponent(args.event_id)}`, query: {}, body: {} };\n      break;\n    }\n    case 'free_slots': {\n      if (!(Number(args.duration_minutes) > 0)) throw new Error('A duração deve ser maior que zero.');\n      const now = DateTime.now().setZone(tz);\n      const first = parseDate(args.start_date);\n      const from = first > now ? first : now;\n      const to = parseDate(args.end_date).plus({ days: 1 });\n      request = listRequest(from, to);\n      break;\n    }\n    default:\n      throw new Error(`Operação desconhecida: ${args.operation}`);\n  }\n} catch (error) {\n  return fail(error.message);\n}\n\nreturn { json: { done: false, operation: args.operation, args, tz, calendarId, request } };\n"
+      }
+    },
+    {
+      "id": "06db9158-0d46-4a4b-a1f3-e0a30633ae62",
+      "name": "Pronto?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.done }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "9e93e725-f294-4435-b6d9-58768fe8dd79",
+      "name": "Chamar Google",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "qUk0ljtNQDiOvjy2",
+          "cachedResultName": "Google Agenda (por pessoa)"
+        },
+        "mode": "each",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "user_key": "={{ $('When Executed by Another Workflow').item.json.user_key }}",
+            "method": "={{ $json.request.method }}",
+            "url": "={{ $json.request.url }}",
+            "query": "={{ $json.request.query }}",
+            "body": "={{ $json.request.body }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "user_key",
+              "displayName": "user_key",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "method",
+              "displayName": "method",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "url",
+              "displayName": "url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "query",
+              "displayName": "query",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            },
+            {
+              "id": "body",
+              "displayName": "body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            }
+          ]
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "e464ee47-79e3-49e3-8a15-e4507afaaca4",
+      "name": "Decidir",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// n8n Code node \"Decidir\" (Portão de agenda) — mode: Run Once for Each Item.\n// Reads the Google response to the first request and either finishes\n// ({ done: true, result }) or prepares a second request for update/delete\n// ({ done: false, request }) after checking the event is ours to change.\n// Input $json: the HTTP response from \"Google Agenda (por pessoa)\": { statusCode, body }.\n// Ported from calendar_tools.py, calendar/google.py and scheduling.py (tag v1-python).\n\nconst plan = $('Planejar').item.json;\nconst { operation, args, tz } = plan;\nconst status = Number($json.statusCode);\nconst body = $json.body || {};\n\nconst WEEKDAYS = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'];\nconst READ_ONLY =\n  'Este evento tem outros participantes ou foi organizado por outra pessoa, então não posso alterá-lo nem cancelá-lo.';\nconst blank = (value) => value === undefined || value === null || String(value).trim() === '';\nconst done = (result) => ({ json: { done: true, result } });\n\nconst formatDay = (dt) => `${WEEKDAYS[dt.weekday - 1]} ${dt.toFormat('dd/MM')}`;\nconst formatRange = (start, end) => `${formatDay(start)} ${start.toFormat('HH:mm')}–${end.toFormat('HH:mm')}`;\n\nfunction parseWhen(field) {\n  return field.dateTime\n    ? DateTime.fromISO(field.dateTime).setZone(tz)\n    : DateTime.fromISO(field.date, { zone: tz });\n}\n\n// Not safely ours to edit: another organiser, or any guest other than us.\n// The API omits \"self\" when it is false, so a missing key means someone else.\nfunction hasAttendees(item) {\n  const organizer = item.organizer;\n  const bySomeoneElse = organizer !== undefined && !organizer.self;\n  return bySomeoneElse || (item.attendees || []).some((attendee) => !attendee.self);\n}\n\nfunction formatEvent(item) {\n  const start = parseWhen(item.start);\n  const end = parseWhen(item.end);\n  const when = item.start.date ? `${formatDay(start)} (dia todo)` : formatRange(start, end);\n  const suffix = hasAttendees(item) ? ' (com convidados — não posso alterar)' : '';\n  return `${when} ${item.summary || '(sem título)'}${suffix}`;\n}\n\nfunction parseDate(text) {\n  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(String(text).trim())) throw new Error(`Data inválida: \"${text}\" (use AAAA-MM-DD)`);\n  return DateTime.fromISO(String(text).trim(), { zone: tz }).startOf('day');\n}\n\nfunction parseTime(text) {\n  const match = /^(\\d{1,2}):(\\d{2})$/.exec(String(text).trim());\n  if (!match || Number(match[1]) > 23 || Number(match[2]) > 59) throw new Error(`Hora inválida: \"${text}\" (use HH:MM)`);\n  return { hour: Number(match[1]), minute: Number(match[2]) };\n}\n\nfunction timedRange(day, startTime, endTime) {\n  const start = day.set(startTime);\n  if (!endTime) return [start, start.plus({ hours: 1 })];\n  let end = day.set(endTime);\n  if (end <= start) end = end.plus({ days: 1 });\n  return [start, end];\n}\n\n// New start/end for an event, keeping its duration when only the day or the start changes.\nfunction newTimes(item) {\n  const newDay = blank(args.date) ? null : parseDate(args.date);\n  const startTime = blank(args.start_time) ? null : parseTime(args.start_time);\n  const endTime = blank(args.end_time) ? null : parseTime(args.end_time);\n  const start = parseWhen(item.start);\n  const end = parseWhen(item.end);\n\n  if (item.start.date) {\n    if (startTime) {\n      const [s, e] = timedRange(newDay || start, startTime, endTime);\n      return { start: { dateTime: s.toISO(), timeZone: tz, date: null }, end: { dateTime: e.toISO(), timeZone: tz, date: null } };\n    }\n    if (endTime) throw new Error('Evento de dia inteiro não tem horário de fim; informe start_time.');\n    const days = end.diff(start, 'days').days;\n    return {\n      start: { date: newDay.toISODate(), dateTime: null },\n      end: { date: newDay.plus({ days }).toISODate(), dateTime: null },\n    };\n  }\n\n  const duration = end.diff(start);\n  const day = (newDay || start).startOf('day');\n  const begin = day.set(startTime || { hour: start.hour, minute: start.minute });\n  const [s, e] = endTime ? timedRange(day, { hour: begin.hour, minute: begin.minute }, endTime) : [begin, begin.plus(duration)];\n  return { start: { dateTime: s.toISO(), timeZone: tz, date: null }, end: { dateTime: e.toISO(), timeZone: tz, date: null } };\n}\n\n// One free slot per day (at most 5), 15-minute buffer around events, 15-minute steps.\nfunction freeSlots(items) {\n  const prefs = $('Ler usuário').item.json;\n  const window = {\n    start: parseTime(blank(args.earliest_time) ? prefs.day_start || '08:00' : args.earliest_time),\n    end: parseTime(blank(args.latest_time) ? prefs.day_end || '22:00' : args.latest_time),\n  };\n  if (window.start.hour * 60 + window.start.minute >= window.end.hour * 60 + window.end.minute) {\n    throw new Error('O horário inicial deve ser anterior ao final.');\n  }\n  const blocked = new Set((prefs.blocked_weekdays || []).map(Number)); // 0 = Monday\n  const duration = { minutes: Number(args.duration_minutes) };\n  const buffer = { minutes: 15 };\n  const rangeStart = DateTime.fromISO(plan.request.query.timeMin).setZone(tz);\n  const rangeEnd = DateTime.fromISO(plan.request.query.timeMax).setZone(tz);\n\n  const busy = items\n    .filter((item) => item.start.dateTime)\n    .map((item) => [parseWhen(item.start).minus(buffer), parseWhen(item.end).plus(buffer)])\n    .sort((a, b) => a[0] - b[0]);\n\n  const roundUp = (moment) => {\n    const midnight = moment.startOf('day');\n    const steps = Math.ceil(moment.diff(midnight, 'minutes').minutes / 15);\n    return midnight.plus({ minutes: steps * 15 });\n  };\n\n  const slots = [];\n  for (let day = rangeStart.startOf('day'); day < rangeEnd && slots.length < 5; day = day.plus({ days: 1 })) {\n    if (blocked.has(day.weekday - 1)) continue;\n    const windowStart = DateTime.max(day.set(window.start), rangeStart);\n    const windowEnd = DateTime.min(day.set(window.end), rangeEnd);\n    let cursor = windowStart;\n    for (const [busyStart, busyEnd] of [...busy, [windowEnd, windowEnd]]) {\n      const gapEnd = DateTime.min(busyStart, windowEnd);\n      const start = roundUp(cursor);\n      if (start.plus(duration) <= gapEnd) {\n        slots.push([start, start.plus(duration)]);\n        break;\n      }\n      cursor = DateTime.max(cursor, busyEnd);\n    }\n  }\n  return slots;\n}\n\nif (status === 404) return done('Evento não encontrado.');\nif (!(status >= 200 && status < 300)) {\n  return done(`Erro no calendário: ${body.error?.message || `HTTP ${status}`}`);\n}\n\ntry {\n  switch (operation) {\n    case 'create':\n      return done(`Evento criado (id ${body.id}): ${formatEvent(body)}`);\n    case 'list': {\n      const items = (body.items || []).filter((item) => item.status !== 'cancelled');\n      if (items.length === 0) return done('Nenhum compromisso no período.');\n      return done(items.map((item) => `[${item.id}] ${formatEvent(item)}`).join('\\n'));\n    }\n    case 'update': {\n      if (hasAttendees(body)) return done(READ_ONLY);\n      const changesTime = !blank(args.date) || !blank(args.start_time) || !blank(args.end_time);\n      if (!changesTime && blank(args.title)) return done('Erro: nada para alterar; informe título, data ou horário.');\n      const patch = {};\n      if (!blank(args.title)) patch.summary = args.title;\n      if (changesTime) Object.assign(patch, newTimes(body));\n      return {\n        json: {\n          done: false,\n          request: { method: 'PATCH', url: plan.request.url, query: { sendUpdates: 'none' }, body: patch },\n        },\n      };\n    }\n    case 'delete':\n      if (hasAttendees(body)) return done(READ_ONLY);\n      return {\n        json: {\n          done: false,\n          request: { method: 'DELETE', url: plan.request.url, query: { sendUpdates: 'none' }, body: {} },\n        },\n      };\n    case 'free_slots': {\n      const items = (body.items || []).filter((item) => item.status !== 'cancelled');\n      const slots = freeSlots(items);\n      if (slots.length === 0) return done('Nenhum horário livre encontrado.');\n      return done(slots.map(([start, end]) => formatRange(start, end)).join('\\n'));\n    }\n    default:\n      return done(`Erro: operação desconhecida: ${operation}`);\n  }\n} catch (error) {\n  return done(`Erro: ${error.message}`);\n}\n"
+      }
+    },
+    {
+      "id": "6b950b5b-b00d-4ba5-a38b-372623814cc1",
+      "name": "Pronto? (2)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1344,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.done }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "341242a6-818a-4850-ada1-b42bad01d52c",
+      "name": "Chamar Google (2)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        1568,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "qUk0ljtNQDiOvjy2",
+          "cachedResultName": "Google Agenda (por pessoa)"
+        },
+        "mode": "each",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "user_key": "={{ $('When Executed by Another Workflow').item.json.user_key }}",
+            "method": "={{ $json.request.method }}",
+            "url": "={{ $json.request.url }}",
+            "query": "={{ $json.request.query }}",
+            "body": "={{ $json.request.body }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "user_key",
+              "displayName": "user_key",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "method",
+              "displayName": "method",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "url",
+              "displayName": "url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "query",
+              "displayName": "query",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            },
+            {
+              "id": "body",
+              "displayName": "body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            }
+          ]
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "d0a8a73c-53af-45ff-961a-94f57548a3cb",
+      "name": "Concluir",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// n8n Code node \"Concluir\" (Portão de agenda) — mode: Run Once for Each Item.\n// Summarises the Google response to the second request (PATCH or DELETE).\n// Input $json: the HTTP response from \"Google Agenda (por pessoa)\": { statusCode, body }.\n\nconst plan = $('Planejar').item.json;\nconst { operation, args, tz } = plan;\nconst status = Number($json.statusCode);\nconst body = $json.body || {};\n\nconst WEEKDAYS = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'];\nconst formatDay = (dt) => `${WEEKDAYS[dt.weekday - 1]} ${dt.toFormat('dd/MM')}`;\nconst parseWhen = (field) =>\n  field.dateTime ? DateTime.fromISO(field.dateTime).setZone(tz) : DateTime.fromISO(field.date, { zone: tz });\n\nfunction formatEvent(item) {\n  const start = parseWhen(item.start);\n  const end = parseWhen(item.end);\n  const when = item.start.date\n    ? `${formatDay(start)} (dia todo)`\n    : `${formatDay(start)} ${start.toFormat('HH:mm')}–${end.toFormat('HH:mm')}`;\n  return `${when} ${item.summary || '(sem título)'}`;\n}\n\nlet result;\nif (status === 404 || status === 410) {\n  result = 'Evento não encontrado.';\n} else if (!(status >= 200 && status < 300)) {\n  result = `Erro no calendário: ${body.error?.message || `HTTP ${status}`}`;\n} else if (operation === 'update') {\n  result = `Evento atualizado (id ${body.id}): ${formatEvent(body)}`;\n} else {\n  result = `Evento ${args.event_id} apagado.`;\n}\n\nreturn { json: { done: true, result } };\n"
+      }
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Ler usuário",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler usuário": {
+      "main": [
+        [
+          {
+            "node": "Planejar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Planejar": {
+      "main": [
+        [
+          {
+            "node": "Pronto?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pronto?": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Chamar Google",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chamar Google": {
+      "main": [
+        [
+          {
+            "node": "Decidir",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decidir": {
+      "main": [
+        [
+          {
+            "node": "Pronto? (2)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pronto? (2)": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Chamar Google (2)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chamar Google (2)": {
+      "main": [
+        [
+          {
+            "node": "Concluir",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "errorWorkflow": "93khVPDggzbYIxrs"
+  },
+  "nodeGroups": [],
+  "tags": []
+}

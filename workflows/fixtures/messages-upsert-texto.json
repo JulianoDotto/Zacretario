@@ -1,0 +1,41 @@
+{
+  "_comment": "Evolution API v2.3.8 MESSAGES_UPSERT webhook as received by the n8n Webhook node (output item). Anonymized: phone numbers, names, ids and the apikey were replaced; messageContextInfo trimmed.",
+  "headers": {
+    "content-type": "application/json",
+    "user-agent": "axios/1.13.2",
+    "host": "n8n:5678"
+  },
+  "params": {},
+  "query": {},
+  "body": {
+    "event": "messages.upsert",
+    "instance": "zacretario",
+    "data": {
+      "key": {
+        "remoteJid": "5511900000000@s.whatsapp.net",
+        "remoteJidAlt": "5511900000000@s.whatsapp.net",
+        "fromMe": false,
+        "id": "3A0000000000000000AA",
+        "participant": "",
+        "addressingMode": "lid"
+      },
+      "pushName": "Ana",
+      "status": "DELIVERY_ACK",
+      "message": {
+        "conversation": "Oi",
+        "messageContextInfo": {}
+      },
+      "messageType": "conversation",
+      "messageTimestamp": 1795656866,
+      "instanceId": "00000000-0000-0000-0000-000000000000",
+      "source": "ios"
+    },
+    "destination": "http://n8n:5678/webhook/whatsapp-entrada",
+    "date_time": "2026-11-25T22:34:27.034Z",
+    "sender": "5511911111111@s.whatsapp.net",
+    "server_url": "http://localhost:8080",
+    "apikey": "<instance token removed>"
+  },
+  "webhookUrl": "https://dotton8n.com.br/webhook/whatsapp-entrada",
+  "executionMode": "production"
+}
