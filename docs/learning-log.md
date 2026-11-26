@@ -62,3 +62,18 @@ Concepts:
 - n8n's instance-level MCP: once enabled and a workflow is marked "available in MCP", Claude can read and edit it directly (it built the four allowlist nodes this way, saved as a named version).
 
 What went wrong: the first test ran the Linux `scp` inside the VPS session (it must run on the PC); the pinned test message, once recorded, blocks every later editor test until its row is deleted.
+
+## Task 6 — The agent (2026-11-26)
+
+A second workflow, `Agente Zacretário`, is a sub-workflow: its trigger (*When Executed by Another Workflow*) takes `user_key`, `name`, `timezone` and `text`. Inside, an **AI Agent** node uses the Anthropic Chat Model (`claude-sonnet-5-5`), a **Postgres Chat Memory** keyed by `user_key` (last 20 messages), the system prompt from [workflows/prompt.md](../workflows/prompt.md), and six **Postgres Tool** nodes for to-dos and preferences ([workflows/tools.md](../workflows/tools.md)). `Entrada Whatsapp` now calls it (`Chamar Agente`) and turns its `output` into the reply (`Resposta`).
+
+Concepts:
+- Sub-workflows as functions: the trigger's fields are the contract; the caller waits and gets the result back. The WhatsApp side and the "thinking" side can change independently.
+- An agent = model (thinks) + memory (remembers) + tools (acts). The tool node's name and description are what the model sees when deciding which to call.
+- `$fromAI('field', 'description', 'type')` is a slot the model fills. Anything not wrapped in `$fromAI` — here `user_key` — the model cannot touch: safety lives in the tool design, not in the prompt.
+- Sub-workflow calls use the **published** version.
+
+What went wrong:
+- Without tools, the model wrote tool calls as plain text.
+- `400 Invalid signature in thinking block`: memory replays Claude's thinking blocks, which are bound to the exact system prompt and tool list. The prompt contained the current minute, so it changed every minute. Fix: the time goes at the start of the user message and the system prompt stays stable; after changing the prompt or the tools, clear `n8n_chat_histories`.
+- The same error came back because two fields in `Chamar Agente` started with an invisible TAB (pressing Tab to move between fields), which turned the timezone into an invalid one. The JSON view shows it as `\t`.
