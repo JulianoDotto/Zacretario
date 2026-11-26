@@ -54,6 +54,29 @@ Os tokens são somados por mensagem (todas as chamadas ao modelo). "passou?" é 
 | Rodada | Teste | Passou? | Chamadas | Ferramentas | Entrada | Cache lido | Cache gravado | Saída | US$ |
 |---|---|---|---|---|---|---|---|---|---|
 | isolamento | "marca teste de isolamento amanhã às 10h" | ✅ (só na agenda de teste) | 2 | create_event | 9.376 | 0 | 0 | 170 | 0,0205 |
-| base | T01 | ✅ | 2 | list_events, list_todos | 9.311 | 0 | 0 | 189 | 0,0205 |
+| base | T01 | ✅ | 2 | list_events, list_todos | 9.311 | 0 | 0 | 196 | 0,0206 |
+| base | T02 | ✅ | 2 | create_event | 9.601 | 0 | 0 | 196 | 0,0212 |
+| base | T03 | ✅ | 2 | create_event | 9.743 | 0 | 0 | 234 | 0,0218 |
+| base | T04 | ✅ | 2 | create_event | 9.897 | 0 | 0 | 225 | 0,0220 |
+| base | T05 ⚠️ | ✅ | 2 | create_event | 10.088 | 0 | 0 | 302 | 0,0232 |
+| base | T06 | ✅ | 2 | add_todo | 9.984 | 0 | 0 | 78 | 0,0207 |
+| base | T07 | ✅ | 2 | list_events | 10.182 | 0 | 0 | 148 | 0,0218 |
+| base | T08 | ✅ | 2 | get_preferences, find_free_slots | 10.716 | 0 | 0 | 485 | 0,0263 |
+| base | T09 | ✅ | 3 | get_preferences, update_preferences | 16.109 | 0 | 0 | 315 | 0,0354 |
+| base | T10 ⚠️ | ✅ | 2 | list_events | 10.974 | 0 | 0 | 140 | 0,0233 |
+| base | T11 ⚠️ | ✅ | 3 | list_events, delete_event | 16.719 | 0 | 0 | 223 | 0,0357 |
+| base | T12a ⚠️ | ✅ | 2 | list_todos | 10.713 | 0 | 0 | 58 | 0,0220 |
+| base | T12b ⚠️ | ✅ | 1 | — | 5.315 | 0 | 0 | 42 | 0,0111 |
+| base | T13 | ✅ | 3 | list_todos, complete_todo | 16.090 | 0 | 0 | 110 | 0,0333 |
+| base | T14 | ✅ | 1 | — | 5.293 | 0 | 0 | 80 | 0,0114 |
+| base | T15 | ✅ | 1 | — | 5.328 | 0 | 0 | 62 | 0,0113 |
+| **base** | **total (16 mensagens)** | **15/15** | **32** | | **166.063** | 0 | 0 | **2.894** | **0,3611** |
 
 **Primeira leitura (26/11):** cada chamada envia cerca de 4.600 tokens (prompt + 10 ferramentas) e recebe poucas centenas. Quase todo o custo é **entrada repetida**, e é isso que o cache barateia.
+
+**Linha de base (26/11, Sonnet 5.5, opções padrão):** todos os 15 testes passaram, inclusive os ⚠️. A média ficou em **US$ 0,0226 por mensagem**, com 2 chamadas por mensagem. **92% do custo é entrada**, quase toda o mesmo prompt + ferramentas repetidos a cada chamada.
+
+Observações:
+- T03: "às 8h" já tinha passado, então foi para amanhã, e o bot explicou o porquê.
+- T09: atualizou a preferência e refez a lista de horários tirando o domingo, sem chamar `find_free_slots` de novo. Ficou certo, mas ele filtrou de cabeça.
+- Mensagens sem ferramenta (T12b, T14, T15) custam a metade: uma chamada só.
