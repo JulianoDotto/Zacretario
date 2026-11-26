@@ -87,6 +87,25 @@ You need a dedicated SIM with WhatsApp (or WhatsApp Business) active on a phone.
 
 Evolution API is licensed under Apache 2.0 with extra conditions: keep its logo and copyright in the manager, and state that the system uses Evolution API (this guide and the README do).
 
+## Database and users
+
+1. Copy the SQL files to the server (from the repository folder on your PC): `scp -r infra/sql root@<IP>:/opt/zacretario/infra/`
+2. Create the tables, in order (on the server, in `/opt/zacretario/infra`):
+
+   ```bash
+   docker compose exec -T postgres psql -U zacretario -d zacretario < sql/001_schema.sql
+   docker compose exec -T postgres psql -U zacretario -d zacretario < sql/002_conversation.sql
+   ```
+
+3. Add each person who may talk to the bot, with their own preferences row (`key` is a short id used by the workflows; `whatsapp_id` is the exact `sender` the **Número desconhecido** node shows when that person first writes):
+
+   ```bash
+   docker compose exec -T postgres psql -U zacretario -d zacretario -c "INSERT INTO users (key, whatsapp_id, name) VALUES ('ana', '5511900000000', 'Ana'); INSERT INTO preferences (user_key) VALUES ('ana');"
+   ```
+
+   Never commit real numbers; [infra/sql/seed.example.sql](../infra/sql/seed.example.sql) shows the format.
+4. In n8n, create the credential **Postgres Zacretário** (Postgres: host `postgres`, database and user `zacretario`, password `ZACRETARIO_DB_PASSWORD` from `infra/.env`, SSL disabled).
+
 ## Google Calendar
 
 Each person connects their own Google account. In n8n a credential is fixed on a node, so the only place that holds Google credentials is the workflow **Google Agenda (por pessoa)**: a Switch on `user_key` with one HTTP Request node per person. Everything else (the agent tools and the **Portão de agenda** logic) only passes `user_key` along.
@@ -95,7 +114,7 @@ Each person connects their own Google account. In n8n a credential is fixed on a
 2. **OAuth client for n8n** (once): Google Auth Platform → Clients → Create client → **Web application**, name `n8n`. Leave *Authorized JavaScript origins* empty and add the redirect URI `https://<domain>/rest/oauth2-credential/callback` under **Authorized redirect URIs**. Keep the client ID and secret.
 3. **One credential per person:** in n8n, Credentials → Create credential → **Google Calendar OAuth2 API**, paste the same client ID and secret, click **Sign in with Google** and let *that person* sign in. Google warns that the app is unverified: Advanced → Go to (app name). Name it `Google Calendar - <Name>`.
 4. **One branch per person:** in **Google Agenda (por pessoa)**, add a rule `user_key` equals `<key>` to **Qual pessoa?** and duplicate the **Agenda - Juliano** node for it, switching its credential. Until then, that person's agenda requests get "Esta pessoa ainda não conectou a agenda Google."
-5. Publish **Google Agenda (por pessoa)**, **Portão de agenda** and **Agente Zacretário** (sub-workflows run their published version), then clear the chat memory: `DELETE FROM n8n_chat_histories;` (changing an agent's tools invalidates the saved conversation).
+5. Publish **Google Agenda (por pessoa)**, **Portão de agenda** and **Agente Zacretário** (sub-workflows run their published version).
 
 ### Updating
 

@@ -10,7 +10,15 @@ A data e a hora **não** ficam aqui: vão no início da mensagem do usuário (ca
 {{ $json.text }}
 ```
 
-Motivo: o Claude grava blocos de raciocínio (*thinking*) na memória, e cada bloco fica preso ao system prompt e à lista de ferramentas exatos de quando foi criado. Com a hora no system prompt, ele mudava a cada minuto e a conversa seguinte falhava com `400 Invalid signature in thinking block`. Pelo mesmo motivo, depois de mudar o prompt ou as ferramentas, apague a memória (`DELETE FROM n8n_chat_histories;`).
+Motivo: com raciocínio (*thinking*), o Claude devolve blocos assinados que só valem junto com o prompt e a conversa exatos de quando foram criados. A hora mudando no system prompt quebrava essas assinaturas. Depois, a memória do n8n também foi trocada por um histórico só de texto (tabela `conversation`, ver `infra/sql/002_conversation.sql`), enviado no início da mensagem do usuário:
+
+```
+[Conversa recente, só para contexto]
+{{ $json.history || '(nenhuma)' }}
+
+[Agora: …]
+{{ $json.text }}
+```
 
 ---
 

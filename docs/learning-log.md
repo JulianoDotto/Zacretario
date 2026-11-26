@@ -89,3 +89,16 @@ Concepts:
 - Code nodes have Luxon's `DateTime` built in; date and timezone logic ported from Python ran unchanged in shape. Writing the Code nodes as files and testing them with Node.js outside n8n (20 cases from the Python tests) caught issues before they reached WhatsApp.
 
 What went wrong: I first pasted the redirect URI into *Authorized JavaScript origins* (which only takes a bare domain).
+
+## Task 8 — Errors, and the memory fix (2026-11-26)
+
+Workflow **Erros** starts with an **Error Trigger** and sends the owner (`owner_key` in its `Configuração` node) a WhatsApp alert with the workflow, the node and the error. It is the *Error workflow* of the other four workflows. In `Entrada Whatsapp`, `Chamar Agente` now continues on error into `Avisar falha`, so the person gets "Tive um problema agora, tenta de novo em instantes." instead of silence. Tested by breaking the Anthropic key on purpose: both messages arrived.
+
+The test also exposed a deeper bug. n8n's Postgres Chat Memory stores the whole exchange, including Claude's signed thinking blocks; a signature is only valid together with everything before it, so when the 20-message window slid, old messages left and the next call failed (`Content before this block was rewritten`). Disabling thinking was not an option (`claude-sonnet-5-5` does not support it). Fix: a text-only history, like the Python version had: table `conversation` (`infra/sql/002_conversation.sql`), `Ler histórico` (last 20 messages in 24 h) → `Contexto do agente` → AI Agent (history at the start of the message) → `Guardar conversa` → `Saída`.
+
+Concepts:
+- Error Trigger + *Error workflow* setting: one central alert workflow reused by all; it only fires for production executions, and the error workflow must itself be published.
+- *On Error → Continue (using error output)* turns a failure into a second output you can handle.
+- Built-in memory is convenient, but you should know what it stores; when a provider adds constraints (signed reasoning), owning the history in your own table is simpler and more predictable.
+
+What went wrong: my first fix (turning thinking off) broke the agent for every message, and the error workflow reported exactly why within seconds — which is the point of having one.
