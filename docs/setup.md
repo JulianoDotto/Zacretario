@@ -58,6 +58,35 @@ You need a VPS with Ubuntu 24.04 (1 vCPU and 4 GB of RAM are enough) and a domai
 
 Docker publishes ports past `ufw`, so the protection for Postgres and Evolution is that the compose file publishes no port for Postgres and binds Evolution to `127.0.0.1`. Keep it that way.
 
+## WhatsApp (Evolution API)
+
+Zacretário talks to WhatsApp through [Evolution API](https://github.com/EvolutionAPI/evolution-api), which connects a number the way WhatsApp Web does (a linked device, paired with a QR code).
+
+> **Unofficial integration.** Evolution API is not Meta's official WhatsApp API. Using it goes against WhatsApp's Terms of Service and the number can be banned. Use a dedicated number, never your personal one, and keep the bot to answering people who write to it. See [why-n8n-evolution.md](why-n8n-evolution.md) for why the project accepts this.
+
+You need a dedicated SIM with WhatsApp (or WhatsApp Business) active on a phone. That phone stays the main device: if it is off or offline for too long, WhatsApp unlinks the bot.
+
+1. **Open the panel through an SSH tunnel** (on your PC). Evolution only listens on the server itself, so the tunnel brings its port to your machine. Keep the window open while you use the panel.
+
+   ```bash
+   ssh -o ServerAliveInterval=60 -L 8080:127.0.0.1:8080 root@<IP>
+   ```
+
+2. Open `http://localhost:8080/manager` and log in with Server URL `http://localhost:8080` and the `EVOLUTION_API_KEY` from `infra/.env` (`grep EVOLUTION_API_KEY /opt/zacretario/infra/.env`; run `clear` afterwards).
+3. **Create the instance:** name `zacretario` (the workflows use this exact name), channel `Baileys`. Keep the generated token.
+4. **Pair:** open the instance, show the QR code, and on the bot's phone go to WhatsApp → Linked devices → Link a device. The instance must show **Connected**.
+5. **Webhook** (Events → Webhook):
+   - Enabled: on
+   - URL: `http://n8n:5678/webhook/whatsapp-entrada` (the container name, so the call stays on Docker's internal network)
+   - Webhook by Events: **off** (otherwise the event name is appended to the URL and n8n never receives it)
+   - Webhook Base64: off
+   - Events: only `MESSAGES_UPSERT`
+
+   Save, reload the page and check that every value stuck.
+6. **n8n credential:** in n8n, Credentials → Create credential → **Header Auth**, name `apikey`, value = the **instance token** (Dashboard of the instance), credential name `Evolution API`. Use the instance token rather than the global key: it can only operate this one instance.
+
+Evolution API is licensed under Apache 2.0 with extra conditions: keep its logo and copyright in the manager, and state that the system uses Evolution API (this guide and the README do).
+
 ### Updating
 
 Images are pinned. To update one, change its tag in `infra/docker-compose.yml`, copy the file to the server, and run `docker compose pull <service> && docker compose up -d <service>`. Read the release notes first, especially for Evolution API.

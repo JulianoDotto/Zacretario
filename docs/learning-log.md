@@ -27,3 +27,11 @@ The whole server is one `docker compose` file in the repository: Caddy, n8n, Pos
 Concepts: a reverse proxy (Caddy) is the only thing facing the internet and gets the HTTPS certificate by itself; containers talk to each other by service name (`n8n:5678`, `postgres:5432`) on Docker's internal network; a port bound to `127.0.0.1` is reachable from the server but not from the internet; n8n stores its own data in Postgres and encrypts saved credentials with `N8N_ENCRYPTION_KEY`.
 
 What went wrong: I ran a Linux command in my PC's PowerShell instead of the SSH session (same window, different machine; the prompt tells which is which). The SSH session also dropped after sitting idle; the containers kept running. Bots hit the new domain seconds after the certificate was issued, so the n8n owner account has to be created immediately.
+
+## Task 3 — Evolution API and pairing (2026-11-25)
+
+The dedicated number is paired with Evolution API as a linked device, and Evolution calls n8n at `http://n8n:5678/webhook/whatsapp-entrada` for every new message (`MESSAGES_UPSERT`). n8n has a Header Auth credential, `Evolution API`, to send replies.
+
+Concepts: an SSH tunnel (`ssh -L`) reaches a service that is deliberately closed to the internet; a webhook is "call me at this URL when X happens"; least privilege: the n8n credential uses the instance token, which only controls this one number, instead of the global key that controls everything.
+
+What went wrong: "Webhook by Events" got switched on when saving, which would have sent events to a different URL; reloading the page and checking every field caught it.
