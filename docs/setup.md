@@ -136,6 +136,8 @@ Only people in the `users` table get an answer.
    Never commit real numbers; [infra/sql/seed.example.sql](../infra/sql/seed.example.sql) shows the format.
 3. If the `key` is new, add their branch in **Google Agenda (por pessoa)** (see step 4 above) and publish it.
 
+**Test person.** Agent evaluations run as the person `teste`, never as a real user: a fake `whatsapp_id` (`teste-sem-whatsapp`, so the bot never answers it) and its own Google calendar, "Zacretário teste", created in the owner's account. Put that calendar's ID (Google Calendar → Settings → the calendar → *Integrate calendar*) in `calendar_id` (see the end of [seed.example.sql](../infra/sql/seed.example.sql)), and in **Google Agenda (por pessoa)** connect the rule `teste` to the owner's node: same credential, different calendar.
+
 ## Updating
 
 Images are pinned. To update one, change its tag in `infra/docker-compose.yml`, copy the file to the server, and run `docker compose pull <service> && docker compose up -d <service>`. Read the release notes first, especially for Evolution API.
