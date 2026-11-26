@@ -35,3 +35,17 @@ The dedicated number is paired with Evolution API as a linked device, and Evolut
 Concepts: an SSH tunnel (`ssh -L`) reaches a service that is deliberately closed to the internet; a webhook is "call me at this URL when X happens"; least privilege: the n8n credential uses the instance token, which only controls this one number, instead of the global key that controls everything.
 
 What went wrong: "Webhook by Events" got switched on when saving, which would have sent events to a different URL; reloading the page and checking every field caught it.
+
+## Task 4 — First workflow: WhatsApp echo (2026-11-25)
+
+Workflow `Entrada Whatsapp`: Webhook → `Normalizar mensagem` (Code) → `Deve Responder?` (If) → `É texto?` (If) → `Dividir mensagem` (Code) → `Enviar resposta` (HTTP Request to Evolution). Non-text messages go to `Avisar só texto`. The bot echoes text once, ignores its own messages and groups, and answers stickers/audio with a notice.
+
+Concepts:
+- Trigger nodes and the two webhook URLs: `/webhook-test/` only while listening in the editor, `/webhook/` only when the workflow is published.
+- Pinned data: freeze a real execution's input on a node, so every test in the editor reuses it without sending a new WhatsApp message. "Copy to editor" (Debug in Editor) pins it for you; it needs the free registered Community Edition.
+- Code node modes: *Run Once for Each Item* returns one item per input (`$json` is the current item); *Run Once for All Items* can return any number of items (`$input.all()`), which is what splitting a long reply needs.
+- A normalising node turns a provider's big payload into a few fields of my own, so the rest of the workflow does not depend on Evolution's format.
+- If nodes split the flow into true/false; an unconnected branch just ends. Filtering `fromMe` is what stops the bot from answering its own replies forever.
+- HTTP Request "Using Fields Below": each row is a JSON name → value; the name is fixed, the value usually an expression.
+
+What went wrong: I searched the node list for "on webhook call" (the search matches node names: "webhook"). The first send returned *Bad Request* because both expressions went into one body field (name = chatId, value = part) instead of two fields `number` and `text`.
