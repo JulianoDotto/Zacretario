@@ -71,23 +71,23 @@ Os tokens são somados por mensagem (todas as chamadas ao modelo). "passou?" é 
 | base | T14 | ✅ | 1 | — | 5.293 | 0 | 0 | 80 | 0,0114 |
 | base | T15 | ✅ | 1 | — | 5.328 | 0 | 0 | 62 | 0,0113 |
 | **base** | **total (16 mensagens)** | **15/15** | **32** | | **166.063** | 0 | 0 | **2.894** | **0,3611** |
-| sonnet-low | T01 | ✅ | 2 | list_events, list_todos | 9.311 | ? | ? | 208 | ver nota |
-| sonnet-low | T02 | ✅ | 2 | create_event | 9.592 | ? | ? | 162 | ver nota |
-| sonnet-low | T03 | ✅ | 2 | create_event | 9.749 | ? | ? | 205 | ver nota |
-| sonnet-low | T04 | ✅ | 2 | create_event | 9.832 | ? | ? | 162 | ver nota |
-| sonnet-low | T05 ⚠️ | ✅ | 2 | create_event | 9.978 | ? | ? | 195 | ver nota |
-| sonnet-low | T06 | ✅ | 2 | add_todo | 9.958 | ? | ? | 92 | ver nota |
-| sonnet-low | T07 | ✅ | 2 | list_events | 10.179 | ? | ? | 146 | ver nota |
-| sonnet-low | T08 | ✅ | 2 | find_free_slots | 10.544 | ? | ? | 403 | ver nota |
-| sonnet-low | T09 | ✅ | 2 | update_preferences | 10.568 | ? | ? | 223 | ver nota |
-| sonnet-low | T10 ⚠️ | ✅ | 2 | list_events | 10.984 | ? | ? | 117 | ver nota |
-| sonnet-low | T11 ⚠️ | ✅ | 3 | list_events, delete_event | 16.738 | ? | ? | 201 | ver nota |
-| sonnet-low | T12a ⚠️ | ✅ | 2 | list_todos | 10.711 | ? | ? | 54 | ver nota |
-| sonnet-low | T12b ⚠️ | ✅ | 1 | — | 5.310 | ? | ? | 40 | ver nota |
-| sonnet-low | T13 | ✅ | 3 | list_todos, complete_todo | 16.114 | ? | ? | 110 | ver nota |
-| sonnet-low | T14 | ✅ | 1 | — | 5.303 | ? | ? | 105 | ver nota |
-| sonnet-low | T15 | ✅ | 1 | — | 5.371 | ? | ? | 60 | ver nota |
-| **sonnet-low** | **total (16 mensagens)** | **15/15** | **31** | | **160.242** (total, com cache) | ? | ? | **2.483** | **~0,09 (estimativa)** |
+| sonnet-low | T01 | ✅ | 2 | list_events, list_todos | 9.311 | 0 | 0 | 208 | — |
+| sonnet-low | T02 | ✅ | 2 | create_event | 9.592 | 0 | 0 | 162 | — |
+| sonnet-low | T03 | ✅ | 2 | create_event | 9.749 | 0 | 0 | 205 | — |
+| sonnet-low | T04 | ✅ | 2 | create_event | 9.832 | 0 | 0 | 162 | — |
+| sonnet-low | T05 ⚠️ | ✅ | 2 | create_event | 9.978 | 0 | 0 | 195 | — |
+| sonnet-low | T06 | ✅ | 2 | add_todo | 9.958 | 0 | 0 | 92 | — |
+| sonnet-low | T07 | ✅ | 2 | list_events | 10.179 | 0 | 0 | 146 | — |
+| sonnet-low | T08 | ✅ | 2 | find_free_slots | 10.544 | 0 | 0 | 403 | — |
+| sonnet-low | T09 | ✅ | 2 | update_preferences | 10.568 | 0 | 0 | 223 | — |
+| sonnet-low | T10 ⚠️ | ✅ | 2 | list_events | 10.984 | 0 | 0 | 117 | — |
+| sonnet-low | T11 ⚠️ | ✅ | 3 | list_events, delete_event | 16.738 | 0 | 0 | 201 | — |
+| sonnet-low | T12a ⚠️ | ✅ | 2 | list_todos | 10.711 | 0 | 0 | 54 | — |
+| sonnet-low | T12b ⚠️ | ✅ | 1 | — | 5.310 | 0 | 0 | 40 | — |
+| sonnet-low | T13 | ✅ | 3 | list_todos, complete_todo | 16.114 | 0 | 0 | 110 | — |
+| sonnet-low | T14 | ✅ | 1 | — | 5.303 | 0 | 0 | 105 | — |
+| sonnet-low | T15 | ✅ | 1 | — | 5.371 | 0 | 0 | 60 | — |
+| **sonnet-low** | **total (16 mensagens)** | **15/15** | **31** | | **160.242** (total, com cache) | 0 | 0 | **2.483** | **0,3453** |
 
 **Primeira leitura (26/11):** cada chamada envia cerca de 4.600 tokens (prompt + 10 ferramentas) e recebe poucas centenas. Quase todo o custo é **entrada repetida**, e é isso que o cache barateia.
 
@@ -101,3 +101,5 @@ Observações:
 **Fase 1 — Sonnet 5.5 + cache 5 min + effort low (26/11):** 15/15 de novo, inclusive os ⚠️. Saída caiu 14% (2.483 contra 2.894 tokens), e o T09 usou 2 chamadas em vez de 3. A requisição sai com `cache_control: {type: ephemeral, ttl: 5m}`, `thinking: adaptive` e `effort: low` (conferido nos dados da execução).
 
 **Limitação da medição:** o n8n soma os tokens de cache no `promptTokens`, então a coluna "Entrada" é o total e não mostra o que veio do cache. Estimativa, supondo que o prefixo de ~4.500 tokens (ferramentas + prompt de sistema) seja lido do cache em 30 das 31 chamadas: ~135 mil lidos a US$ 0,10/M, ~21 mil gravados a US$ 2,50/M, saída a US$ 10/M, **≈ US$ 0,09 na rodada, ≈ US$ 0,006 por mensagem (−75%)**. **Precisa ser confirmado no console da Anthropic** (Usage, tokens "cache read" de 26/11).
+
+**Conferido no console da Anthropic (26/11):** gravação e leitura de cache do dia = **US$ 0**. O cache **não pegou**: a rodada custou o mesmo que sem cache (≈ US$ 0,32 de entrada + US$ 0,025 de saída ≈ **US$ 0,345**, −4% contra a base, só pelo effort low). A requisição registrada pelo n8n mostra `cache_control` no topo, mas nada foi gravado. Hipótese: a versão do n8n/LangChain não repassa esse campo para a API. A estimativa de −75% acima **não vale**.
