@@ -87,6 +87,16 @@ You need a dedicated SIM with WhatsApp (or WhatsApp Business) active on a phone.
 
 Evolution API is licensed under Apache 2.0 with extra conditions: keep its logo and copyright in the manager, and state that the system uses Evolution API (this guide and the README do).
 
+## Google Calendar
+
+Each person connects their own Google account. In n8n a credential is fixed on a node, so the only place that holds Google credentials is the workflow **Google Agenda (por pessoa)**: a Switch on `user_key` with one HTTP Request node per person. Everything else (the agent tools and the **Portão de agenda** logic) only passes `user_key` along.
+
+1. **Google Cloud project** (once): enable the Google Calendar API; on the OAuth consent screen choose **External** and **Publish app** so the status is **In production** (in "Testing", access expires after 7 days).
+2. **OAuth client for n8n** (once): Google Auth Platform → Clients → Create client → **Web application**, name `n8n`. Leave *Authorized JavaScript origins* empty and add the redirect URI `https://<domain>/rest/oauth2-credential/callback` under **Authorized redirect URIs**. Keep the client ID and secret.
+3. **One credential per person:** in n8n, Credentials → Create credential → **Google Calendar OAuth2 API**, paste the same client ID and secret, click **Sign in with Google** and let *that person* sign in. Google warns that the app is unverified: Advanced → Go to (app name). Name it `Google Calendar - <Name>`.
+4. **One branch per person:** in **Google Agenda (por pessoa)**, add a rule `user_key` equals `<key>` to **Qual pessoa?** and duplicate the **Agenda - Juliano** node for it, switching its credential. Until then, that person's agenda requests get "Esta pessoa ainda não conectou a agenda Google."
+5. Publish **Google Agenda (por pessoa)**, **Portão de agenda** and **Agente Zacretário** (sub-workflows run their published version), then clear the chat memory: `DELETE FROM n8n_chat_histories;` (changing an agent's tools invalidates the saved conversation).
+
 ### Updating
 
 Images are pinned. To update one, change its tag in `infra/docker-compose.yml`, copy the file to the server, and run `docker compose pull <service> && docker compose up -d <service>`. Read the release notes first, especially for Evolution API.

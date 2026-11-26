@@ -77,3 +77,15 @@ What went wrong:
 - Without tools, the model wrote tool calls as plain text.
 - `400 Invalid signature in thinking block`: memory replays Claude's thinking blocks, which are bound to the exact system prompt and tool list. The prompt contained the current minute, so it changed every minute. Fix: the time goes at the start of the user message and the system prompt stays stable; after changing the prompt or the tools, clear `n8n_chat_histories`.
 - The same error came back because two fields in `Chamar Agente` started with an invisible TAB (pressing Tab to move between fields), which turned the timezone into an invalid one. The JSON view shows it as `\t`.
+
+## Task 7 — Calendar gateway (2026-11-26)
+
+Two new sub-workflows. **Google Agenda (por pessoa)** is the only place with Google credentials: a Switch on `user_key` sends a generic request (`method`, `url`, `query`, `body`) to the HTTP Request node holding that person's credential. **Portão de agenda** has the logic and no credentials: `Planejar` builds the Google Calendar API request, `Decidir` reads the answer (and, to reschedule or cancel, first checks the event has no guests and no other organiser), `Concluir` summarises the second call. Free slots are computed in `Decidir` from the day's events and the person's preferences. The agent got five *Call n8n Workflow* tools (`create_event`, `list_events`, `update_event`, `delete_event`, `find_free_slots`).
+
+Concepts:
+- An OAuth client identifies the **app** (same client ID/secret for everyone); signing in identifies the **person**; n8n stores and refreshes each person's token. Origins vs. redirect URIs: the redirect is where Google sends you back after login.
+- In n8n a credential is fixed on a node, so per-person access means one node per person; isolating that in one small workflow keeps the rest of the system unaware of it (and swappable later: one instance per client, or tokens stored per user).
+- HTTP Request with *Full Response* + *Never Error* returns status codes as data, so a Code node can decide what a 404 or 403 means.
+- Code nodes have Luxon's `DateTime` built in; date and timezone logic ported from Python ran unchanged in shape. Writing the Code nodes as files and testing them with Node.js outside n8n (20 cases from the Python tests) caught issues before they reached WhatsApp.
+
+What went wrong: I first pasted the redirect URI into *Authorized JavaScript origins* (which only takes a bare domain).
