@@ -49,3 +49,16 @@ Concepts:
 - HTTP Request "Using Fields Below": each row is a JSON name → value; the name is fixed, the value usually an expression.
 
 What went wrong: I searched the node list for "on webhook call" (the search matches node names: "webhook"). The first send returned *Bad Request* because both expressions went into one body field (name = chatId, value = part) instead of two fields `number` and `text`.
+
+## Task 5 — Database, allowlist and duplicate protection (2026-11-26)
+
+The `zacretario` database has `users`, `preferences`, `todos` and `processed_messages` ([infra/sql/001_schema.sql](../infra/sql/001_schema.sql)). The workflow now records each message id (`Marcar como processada` → `É nova?`), looks the sender up (`Buscar usuário` → `Usuário conhecido?`), and builds one `Contexto` item with the person's data plus the message. Unknown numbers stop at `Número desconhecido`, which shows the exact `sender` to add to `users`.
+
+Concepts:
+- Query parameters (`$1` + Query Parameters) instead of pasting values into SQL: the value never becomes SQL, so no SQL injection.
+- `INSERT … ON CONFLICT DO NOTHING RETURNING` as a one-step "have I seen this?" check; the Postgres node returns `success: true` when nothing was inserted, so an If checks for `message_id`.
+- *Always Output Data*: a query with no rows normally ends the branch silently; with this setting it outputs an empty item, so the "unknown" path can still run.
+- After a database node, `$json` is the database row; `$('Node name').item.json` reads data from an earlier node.
+- n8n's instance-level MCP: once enabled and a workflow is marked "available in MCP", Claude can read and edit it directly (it built the four allowlist nodes this way, saved as a named version).
+
+What went wrong: the first test ran the Linux `scp` inside the VPS session (it must run on the PC); the pinned test message, once recorded, blocks every later editor test until its row is deleted.
