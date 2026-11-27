@@ -43,7 +43,7 @@ Em todos os testes: português do Brasil, sem ids nem nomes de ferramentas, *neg
 | Modelo | Entrada | Saída | Cache lido | Cache gravado (5 min) |
 |---|---|---|---|---|
 | Sonnet 5.5 | 2,00 | 10,00 | 0,10 | 2,50 |
-| Haiku 5.5 | 0,10 | 0,50 | conferir | conferir |
+| Haiku 5.5 | 0,10 | 0,50 | 0,01 | 0,125 |
 
 Custo de uma mensagem = soma, em todas as chamadas do laço, de entrada × preço + saída × preço (+ cache, quando houver).
 
@@ -144,3 +144,9 @@ Custo dos três: 29.551 tokens de entrada e 970 de saída, ≈ US$ 0,0034.
 | T14 | ✅ | 1 | 2.296 | 72 | recusou o poema |
 
 O Groq conta cerca de **metade dos tokens** por chamada (~2.200 contra ~4.700, porque o tokenizador é diferente). Com isso, o limite grátis de 8 mil tokens por minuto aguentou 5 mensagens em ~70 s sem erro, e o risco de estourar ficou menor do que o previsto. As respostas são mais secas, mas o fallback cumpre as regras ⚠️.
+
+**Correções da revisão (27/11):**
+- O *Decidir* do Portão agora corta `earliest_time`/`latest_time` para dentro da janela. Teste com "entre 6h e 9h": o bot explicou que a janela começa às 8h e propôs só 08:00–09:00.
+- O *Planejar* recusa a pessoa `teste` na agenda `primary`.
+- O **Testes do agente** só roda em execução manual (`$execution.mode = test`); qualquer outra chamada recebe 403. O caminho de recusa apareceu sem querer na primeira versão, que comparava com "manual".
+- O **Medir** só lê execuções da cópia de teste e não salva execuções que deram certo. O caminho de recusa não foi exercitado diretamente.

@@ -221,6 +221,87 @@
           "waitForSubWorkflow": true
         }
       }
+    },
+    {
+      "id": "c2bffde6-1726-4fe1-89c2-f39fd07c8493",
+      "name": "Manual? (mensagem)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        112,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "m1",
+              "leftValue": "={{ $execution.mode }}",
+              "rightValue": "test",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "2f49198f-a9bb-4d8c-91aa-82345cbf17a4",
+      "name": "Manual? (reset)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        112,
+        240
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "m2",
+              "leftValue": "={{ $execution.mode }}",
+              "rightValue": "test",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c749aa82-30c8-4966-a1d0-d70e74ea9318",
+      "name": "Recusar",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        224,
+        400
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "Só roda em execução manual.",
+        "options": {
+          "responseCode": 403
+        }
+      }
     }
   ],
   "connections": {
@@ -228,7 +309,7 @@
       "main": [
         [
           {
-            "node": "Chamar Agente como teste",
+            "node": "Manual? (mensagem)",
             "type": "main",
             "index": 0
           }
@@ -239,7 +320,7 @@
       "main": [
         [
           {
-            "node": "Limpar dados do teste",
+            "node": "Manual? (reset)",
             "type": "main",
             "index": 0
           }
@@ -273,6 +354,42 @@
         [
           {
             "node": "Resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual? (mensagem)": {
+      "main": [
+        [
+          {
+            "node": "Chamar Agente como teste",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Recusar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual? (reset)": {
+      "main": [
+        [
+          {
+            "node": "Limpar dados do teste",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Recusar",
             "type": "main",
             "index": 0
           }

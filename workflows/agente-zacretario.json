@@ -887,7 +887,7 @@
         232
       ],
       "parameters": {
-        "description": "Sugere horários livres (no máximo um por dia) respeitando a janela de horário do usuário. earliest_time/latest_time sobrescrevem a janela só nesta busca.",
+        "description": "Sugere horários livres (no máximo um por dia) dentro da janela de horário do usuário. earliest_time/latest_time só estreitam essa janela nesta busca, nunca a ampliam.",
         "source": "database",
         "workflowId": {
           "__rl": true,
@@ -908,8 +908,8 @@
             "start_date": "={{ $fromAI('start_date', 'Data no formato AAAA-MM-DD.', 'string') }}",
             "end_date": "={{ $fromAI('end_date', 'Data no formato AAAA-MM-DD.', 'string') }}",
             "duration_minutes": "={{ $fromAI('duration_minutes', 'Duração em minutos (número).', 'string') }}",
-            "earliest_time": "={{ $fromAI('earliest_time', 'Início mais cedo HH:MM; vazio para usar a preferência.', 'string') }}",
-            "latest_time": "={{ $fromAI('latest_time', 'Fim mais tarde HH:MM; vazio para usar a preferência.', 'string') }}"
+            "earliest_time": "={{ $fromAI('earliest_time', 'Início mais cedo HH:MM, dentro da janela das preferências; vazio para usar a preferência.', 'string') }}",
+            "latest_time": "={{ $fromAI('latest_time', 'Fim mais tarde HH:MM, dentro da janela das preferências; vazio para usar a preferência.', 'string') }}"
           },
           "matchingColumns": [],
           "schema": [
