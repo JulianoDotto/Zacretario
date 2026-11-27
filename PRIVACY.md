@@ -10,7 +10,7 @@ Zacretário is a personal, non-commercial assistant used only by its author and 
 
 ## How data is used
 
-Data is used only to provide the assistant's features to the same user who sent the request. Message text and the recent conversation are sent to Anthropic's Claude API to interpret the request. Nothing is sold, shared for advertising, or used to train models by this project.
+Data is used only to provide the assistant's features to the same user who sent the request. Message text and the recent conversation are sent to Anthropic's Claude API to interpret the request. If Claude is unavailable (for example, out of credits or overloaded), the same request is sent to Groq's API as a fallback, with Groq's Zero Data Retention enabled so inputs and outputs are not stored. Nothing is sold, shared for advertising, or used to train models by this project.
 
 ## Storage and retention
 
