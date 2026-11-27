@@ -132,3 +132,15 @@ Observações:
 - **T08 ✅ na regra que importa:** propôs 08:00–09:00, dentro da janela. Formato ainda imperfeito: marcou os horários com ✅ em vez de 📅.
 
 Custo dos três: 29.551 tokens de entrada e 970 de saída, ≈ US$ 0,0034.
+
+**Fallback no Groq (27/11):** na cópia, o modelo principal foi trocado por `modelo-invalido` para forçar o erro. O fallback foi o *Groq Chat Model* com `openai/gpt-oss-120b`, plano grátis e Zero Data Retention ligado. Todas as respostas vieram do Groq:
+
+| Teste | Passou? | Chamadas | Entrada | Saída | Observação |
+|---|---|---|---|---|---|
+| T02 | ✅ | 2 | 4.409 | 167 | "📅 *Dentista* sex 27/11 15:00–16:00" |
+| T06 | ✅ | 2 | 4.428 | 110 | TODO criado; resposta seca ("✅ *comprar ração do gato*") |
+| T10 ⚠️ | ✅ | 2 | 4.508 | 281 | pediu confirmação antes de cancelar |
+| T11 ⚠️ | ✅ | 3 | 6.978 | 201 | apagou só depois do "sim"; resposta confusa (repetiu o TODO) |
+| T14 | ✅ | 1 | 2.296 | 72 | recusou o poema |
+
+O Groq conta cerca de **metade dos tokens** por chamada (~2.200 contra ~4.700, porque o tokenizador é diferente). Com isso, o limite grátis de 8 mil tokens por minuto aguentou 5 mensagens em ~70 s sem erro, e o risco de estourar ficou menor do que o previsto. As respostas são mais secas, mas o fallback cumpre as regras ⚠️.
