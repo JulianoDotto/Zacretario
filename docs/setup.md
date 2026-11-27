@@ -79,7 +79,7 @@ You need a dedicated SIM with WhatsApp (or WhatsApp Business) active on a phone.
    - Enabled: on
    - URL: `http://n8n:5678/webhook/whatsapp-entrada` (the container name, so the call stays on Docker's internal network)
    - Webhook by Events: **off** (otherwise the event name is appended to the URL and n8n never receives it)
-   - Webhook Base64: off
+   - Webhook Base64: off (media is fetched later, only for allowlisted people, by **Ler mídia**)
    - Events: only `MESSAGES_UPSERT`
 
    Save, reload the page and check that every value stuck.
@@ -114,6 +114,16 @@ If Claude fails (no credits, overload), the AI Agent repeats the call on Groq.
 
 The free plan allows about 8K tokens per minute. Groq counts roughly half the tokens Anthropic does for the same prompt, so a few messages per minute fit.
 
+## Reading media (audio, images, PDFs)
+
+The workflow **Ler mídia** reads what people send besides text:
+
+- **Audio** is transcribed by Groq's Whisper (`whisper-large-v3-turbo`, Portuguese) with the same **Groq** credential as the fallback. The *Transcrever* node is an HTTP Request with *Predefined Credential Type → Groq*.
+- **Images and PDFs** go to two **Anthropic** nodes (*image/analyze* and *document/analyze*, `claude-haiku-5-5`) with the extraction prompt in [workflows/prompt-extracao.md](../workflows/prompt-extracao.md).
+- The file is fetched from Evolution (`/chat/getBase64FromMediaMessage`) with the whole message, because Evolution is set not to store messages and cannot find one by id.
+
+In its settings, keep **Save successful production executions: off** (only failures are kept, for debugging) and **Error workflow: Erros**. Limits (5 min of audio, 5 MB per image, 10 pages or 10 MB per PDF) live in the `Normalizar mensagem` Code node.
+
 ## Google Calendar
 
 Each person connects their own Google account. In n8n a credential is fixed on a node, so the only place that holds Google credentials is the workflow **Google Agenda (por pessoa)**: a Switch on `user_key` with one HTTP Request node per person. Everything else (the agent tools and the **Portão de agenda** logic) only passes `user_key` along.
@@ -126,12 +136,12 @@ Each person connects their own Google account. In n8n a credential is fixed on a
 
 The exported workflows are in [workflows/](../workflows/), without credentials and without pinned data.
 
-1. In n8n, import each file (Workflows → Create → Import from file), in this order: `google-agenda-por-pessoa.json`, `portao-de-agenda.json`, `erros.json`, `agente-zacretario.json`, `entrada-whatsapp.json`. Optional, for evaluations: `medir-execucao-do-agente.json`, then `testes-do-agente.json`. Duplicate the agent as a published test copy, point *Chamar Agente como teste* at it and *Medir* at the measuring workflow, and put the copy's id in *É da cópia de teste?*. It needs an **n8n API** credential, and the domain in the two HTTP nodes is this instance's. Keep **Testes do agente** unpublished; it also refuses anything that is not a manual run.
-2. Open every node that shows a credential warning and pick the matching credential (`Evolution API`, `Postgres Zacretário`, `Anthropic`, `Google Calendar - <Name>`).
-3. Workflows call each other by id, and imported workflows get new ids. Re-select the target workflow in: *Chamar Google* and *Chamar Google (2)* (Portão de agenda → Google Agenda (por pessoa)), the five calendar tools in the agent (→ Portão de agenda), and *Chamar Agente* (Entrada Whatsapp → Agente Zacretário). Set **Erros** as the *Error workflow* in the settings of the other four.
+1. In n8n, import each file (Workflows → Create → Import from file), in this order: `google-agenda-por-pessoa.json`, `portao-de-agenda.json`, `erros.json`, `agente-zacretario.json`, `ler-midia.json`, `entrada-whatsapp.json`. Optional, for evaluations: `medir-execucao-do-agente.json`, then `testes-do-agente.json`. Duplicate the agent as a published test copy, point *Chamar Agente como teste* at it and *Medir* at the measuring workflow, and put the copy's id in *É da cópia de teste?*. It needs an **n8n API** credential, and the domain in the two HTTP nodes is this instance's. Keep **Testes do agente** unpublished; it also refuses anything that is not a manual run.
+2. Open every node that shows a credential warning and pick the matching credential (`Evolution API`, `Postgres Zacretário`, `Anthropic`, `Groq`, `Google Calendar - <Name>`).
+3. Workflows call each other by id, and imported workflows get new ids. Re-select the target workflow in: *Chamar Google* and *Chamar Google (2)* (Portão de agenda → Google Agenda (por pessoa)), the five calendar tools in the agent (→ Portão de agenda), *Chamar Agente* (Entrada Whatsapp → Agente Zacretário) and *Ler mídia* (Entrada Whatsapp → Ler mídia). In **Testes do agente**, also *Chamar Ler mídia*. Set **Erros** as the *Error workflow* in the settings of the other five.
 4. **One branch per person** in **Google Agenda (por pessoa)**: for each person, a rule `user_key` equals `<key>` in **Qual pessoa?** and a copy of the **Agenda - Juliano** node using that person's credential. Without a branch, that person's agenda requests get "Esta pessoa ainda não conectou a agenda Google."
 5. In **Erros**, set `owner_key` in *Configuração* to the owner's key (the one you will use in the next section).
-6. Publish **Erros** first, then **Google Agenda (por pessoa)**, **Portão de agenda** and **Agente Zacretário** (sub-workflows run their published version), then **Entrada Whatsapp** last.
+6. Publish **Erros** first, then **Google Agenda (por pessoa)**, **Portão de agenda**, **Agente Zacretário** and **Ler mídia** (sub-workflows run their published version), then **Entrada Whatsapp** last.
 
 ## Add people
 

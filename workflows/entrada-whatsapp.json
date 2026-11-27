@@ -24,7 +24,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "// n8n Code node \"Normalizar mensagem\" — mode: Run Once for Each Item.\n// Turns the Evolution API MESSAGES_UPSERT webhook into the few fields the\n// rest of the workflow needs. Payload sample: workflows/fixtures/messages-upsert-texto.json\n\n// Media the bot cannot read yet: these get the \"text only\" notice.\nconst MEDIA_TYPES = new Set([\n  'imageMessage', 'audioMessage', 'videoMessage', 'documentMessage', 'documentWithCaptionMessage',\n  'stickerMessage', 'locationMessage', 'liveLocationMessage', 'contactMessage', 'contactsArrayMessage',\n  'ptvMessage',\n]);\n\nconst body = $json.body ?? {};\nconst data = body.data ?? {};\nconst key = data.key ?? {};\n\n// Disappearing and view-once messages wrap the real message one level down.\nlet message = data.message ?? {};\nfor (const wrapper of ['ephemeralMessage', 'viewOnceMessage', 'viewOnceMessageV2']) {\n  if (message[wrapper]?.message) message = message[wrapper].message;\n}\n\n// WhatsApp is moving senders to \"@lid\" ids. Prefer the phone JID when either\n// field carries one; otherwise keep the raw id so it can still be allowlisted.\nconst jids = [key.remoteJid, key.remoteJidAlt].filter(Boolean);\nconst phoneJid = jids.find((jid) => jid.endsWith('@s.whatsapp.net'));\nconst sender = phoneJid ? phoneJid.split('@')[0] : (key.remoteJid ?? '');\n\nconst rawText = message.conversation ?? message.extendedTextMessage?.text ?? null;\nconst text = typeof rawText === 'string' && rawText.trim() !== '' ? rawText.trim() : null;\nconst isText = text !== null;\nconst isMedia = !isText && Object.keys(message).some((type) => MEDIA_TYPES.has(type));\n\nreturn {\n  json: {\n    isMessageEvent: body.event === 'messages.upsert',\n    messageId: key.id ?? '',\n    chatId: key.remoteJid ?? '', // reply exactly where the message came from\n    sender,\n    text,\n    fromMe: key.fromMe === true,\n    isGroup: (key.remoteJid ?? '').endsWith('@g.us'),\n    isText,\n    // Reactions, edits, deletions, poll votes and other events: no reply at all.\n    ignore: !isText && !isMedia,\n  },\n};\n"
+        "jsCode": "// n8n Code node \"Normalizar mensagem\" — mode: Run Once for Each Item.\n// Turns the Evolution API MESSAGES_UPSERT webhook into the few fields the\n// rest of the workflow needs. Payload sample: workflows/fixtures/messages-upsert-texto.json\n\n// Any media type. Readable ones (see readableMedia) go to \"Ler mídia\";\n// the rest get the \"text only\" notice.\nconst MEDIA_TYPES = new Set([\n  'imageMessage', 'audioMessage', 'videoMessage', 'documentMessage', 'documentWithCaptionMessage',\n  'stickerMessage', 'locationMessage', 'liveLocationMessage', 'contactMessage', 'contactsArrayMessage',\n  'ptvMessage',\n]);\n\n// Limits for readable media. Above them the person gets a polite notice and\n// nothing is fetched. Missing metadata never blocks a message.\nconst MAX_AUDIO_SECONDS = 300;\nconst MAX_IMAGE_BYTES = 5 * 1024 * 1024;\nconst MAX_PDF_BYTES = 10 * 1024 * 1024;\nconst MAX_PDF_PAGES = 10;\n\n// WhatsApp sends 64-bit sizes as {low, high}; they may also come as a number or a string.\nfunction toNumber(value) {\n  if (value == null) return null;\n  if (typeof value === 'object') return (value.high >>> 0) * 2 ** 32 + (value.low >>> 0);\n  const n = Number(value);\n  return Number.isFinite(n) ? n : null;\n}\n\nconst over = (value, max) => value !== null && value > max;\n\n// Returns { mediaKind, media } for audio, images and PDFs, or null.\nfunction readableMedia(message) {\n  if (message.audioMessage) return { mediaKind: 'audio', media: message.audioMessage };\n  if (message.imageMessage) return { mediaKind: 'image', media: message.imageMessage };\n  const doc = message.documentMessage\n    ?? message.documentWithCaptionMessage?.message?.documentMessage;\n  if (doc?.mimetype === 'application/pdf') return { mediaKind: 'pdf', media: doc };\n  return null;\n}\n\nfunction isTooBig(mediaKind, media) {\n  const bytes = toNumber(media.fileLength);\n  if (mediaKind === 'audio') return over(toNumber(media.seconds), MAX_AUDIO_SECONDS);\n  if (mediaKind === 'image') return over(bytes, MAX_IMAGE_BYTES);\n  return over(bytes, MAX_PDF_BYTES) || over(toNumber(media.pageCount), MAX_PDF_PAGES);\n}\n\nconst body = $json.body ?? {};\nconst data = body.data ?? {};\nconst key = data.key ?? {};\n\n// Disappearing and view-once messages wrap the real message one level down.\nlet message = data.message ?? {};\nfor (const wrapper of ['ephemeralMessage', 'viewOnceMessage', 'viewOnceMessageV2']) {\n  if (message[wrapper]?.message) message = message[wrapper].message;\n}\n\n// WhatsApp is moving senders to \"@lid\" ids. Prefer the phone JID when either\n// field carries one; otherwise keep the raw id so it can still be allowlisted.\nconst jids = [key.remoteJid, key.remoteJidAlt].filter(Boolean);\nconst phoneJid = jids.find((jid) => jid.endsWith('@s.whatsapp.net'));\nconst sender = phoneJid ? phoneJid.split('@')[0] : (key.remoteJid ?? '');\n\nconst rawText = message.conversation ?? message.extendedTextMessage?.text ?? null;\nconst text = typeof rawText === 'string' && rawText.trim() !== '' ? rawText.trim() : null;\nconst isText = text !== null;\nconst isMedia = !isText && Object.keys(message).some((type) => MEDIA_TYPES.has(type));\n\nconst readable = isMedia ? readableMedia(message) : null;\nconst media = readable?.media ?? {};\nconst rawCaption = typeof media.caption === 'string' ? media.caption.trim() : '';\n\nreturn {\n  json: {\n    isMessageEvent: body.event === 'messages.upsert',\n    messageId: key.id ?? '',\n    chatId: key.remoteJid ?? '', // reply exactly where the message came from\n    sender,\n    text,\n    fromMe: key.fromMe === true,\n    isGroup: (key.remoteJid ?? '').endsWith('@g.us'),\n    isText,\n    // Readable media: 'audio' | 'image' | 'pdf'. null for text and for media the bot can't read.\n    mediaKind: readable?.mediaKind ?? null,\n    mimetype: readable ? (media.mimetype ?? null) : null,\n    caption: rawCaption !== '' ? rawCaption : null,\n    // A forwarded voice note is someone else speaking: treated as data, not as a request.\n    isForwarded: media.contextInfo?.isForwarded === true || data.contextInfo?.isForwarded === true,\n    tooBig: readable ? isTooBig(readable.mediaKind, media) : false,\n    // Evolution does not store messages (DATABASE_SAVE_DATA_NEW_MESSAGE=false), so\n    // \"Ler mídia\" hands it the whole message: the media keys let it download and decrypt.\n    webMessage: readable ? { key, message } : null,\n    // Reactions, edits, deletions, poll votes and other events: no reply at all.\n    ignore: !isText && !isMedia,\n  },\n};\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -197,7 +197,7 @@
             },
             {
               "name": "text",
-              "value": "=Por enquanto eu só entendo mensagens de texto 🙂"
+              "value": "=Por enquanto eu entendo texto, áudio, imagens e PDFs 🙂"
             }
           ]
         },
@@ -206,8 +206,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
       "position": [
-        2016,
-        64
+        2464,
+        320
       ],
       "id": "60daa256-8746-4656-aee8-96ee7cb21b13",
       "name": "Avisar só texto",
@@ -384,6 +384,42 @@
               "name": "isText",
               "value": "={{ $('Normalizar mensagem').item.json.isText }}",
               "type": "boolean"
+            },
+            {
+              "id": "a9",
+              "name": "mediaKind",
+              "value": "={{ $('Normalizar mensagem').item.json.mediaKind ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "a10",
+              "name": "mimetype",
+              "value": "={{ $('Normalizar mensagem').item.json.mimetype ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "a11",
+              "name": "caption",
+              "value": "={{ $('Normalizar mensagem').item.json.caption ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "a12",
+              "name": "isForwarded",
+              "value": "={{ $('Normalizar mensagem').item.json.isForwarded === true }}",
+              "type": "boolean"
+            },
+            {
+              "id": "a13",
+              "name": "tooBig",
+              "value": "={{ $('Normalizar mensagem').item.json.tooBig === true }}",
+              "type": "boolean"
+            },
+            {
+              "id": "a14",
+              "name": "webMessage",
+              "value": "={{ $('Normalizar mensagem').item.json.webMessage ?? {} }}",
+              "type": "object"
             }
           ]
         },
@@ -561,6 +597,276 @@
           "name": "Evolution API"
         }
       }
+    },
+    {
+      "id": "af30ada0-cc47-4e25-9c14-c1a73127a8f0",
+      "name": "Grande demais?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2016,
+        160
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "gd1",
+              "leftValue": "={{ $json.tooBig }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "5d77aa4a-009d-412d-b28f-e79a40403693",
+      "name": "Avisar grande demais",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2240,
+        320
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://evolution:8080/message/sendText/zacretario",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $('Contexto').item.json.chatId }}"
+            },
+            {
+              "name": "text",
+              "value": "=Esse arquivo é grande demais pra eu ler 🙂 Me manda um menor ou escreve o principal?"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "NpMON9VoF8ia9dwU",
+          "name": "Evolution API"
+        }
+      }
+    },
+    {
+      "id": "b2a30ec1-4ac3-4d85-828d-190596f955f3",
+      "name": "É mídia legível?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2240,
+        160
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ml1",
+              "leftValue": "={{ $json.mediaKind }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "960e6c74-3d40-4f08-b285-f78eab69fdd5",
+      "name": "Ler mídia",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        2464,
+        64
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "xjs8GAoLEhaNKj5Q",
+          "cachedResultName": "Ler mídia",
+          "cachedResultUrl": "/workflow/xjs8GAoLEhaNKj5Q"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "webMessage": "={{ $json.webMessage }}",
+            "mediaKind": "={{ $json.mediaKind }}",
+            "mimetype": "={{ $json.mimetype }}",
+            "caption": "={{ $json.caption }}",
+            "isForwarded": "={{ $json.isForwarded }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "webMessage",
+              "displayName": "webMessage",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object",
+              "removed": false
+            },
+            {
+              "id": "mediaKind",
+              "displayName": "mediaKind",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "mimetype",
+              "displayName": "mimetype",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "caption",
+              "displayName": "caption",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "isForwarded",
+              "displayName": "isForwarded",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "boolean",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "each",
+        "options": {}
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "42f3e730-8f9b-4a33-b351-eeda63d84584",
+      "name": "Texto da mídia",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2688,
+        64
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "tm1",
+              "name": "user_key",
+              "value": "={{ $('Contexto').item.json.user_key }}",
+              "type": "string"
+            },
+            {
+              "id": "tm2",
+              "name": "name",
+              "value": "={{ $('Contexto').item.json.name }}",
+              "type": "string"
+            },
+            {
+              "id": "tm3",
+              "name": "timezone",
+              "value": "={{ $('Contexto').item.json.timezone }}",
+              "type": "string"
+            },
+            {
+              "id": "tm4",
+              "name": "text",
+              "value": "={{ $json.text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "6113eba7-3209-4d0e-a8b9-dc84d80d1633",
+      "name": "Avisar falha de leitura",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2688,
+        224
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://evolution:8080/message/sendText/zacretario",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $('Contexto').item.json.chatId }}"
+            },
+            {
+              "name": "text",
+              "value": "Não consegui ler isso agora, pode mandar em texto?"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "NpMON9VoF8ia9dwU",
+          "name": "Evolution API"
+        }
+      }
     }
   ],
   "connections": {
@@ -608,7 +914,7 @@
         ],
         [
           {
-            "node": "Avisar só texto",
+            "node": "Grande demais?",
             "type": "main",
             "index": 0
           }
@@ -711,6 +1017,71 @@
         [
           {
             "node": "Dividir mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Grande demais?": {
+      "main": [
+        [
+          {
+            "node": "Avisar grande demais",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "É mídia legível?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "É mídia legível?": {
+      "main": [
+        [
+          {
+            "node": "Ler mídia",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Avisar só texto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler mídia": {
+      "main": [
+        [
+          {
+            "node": "Texto da mídia",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Avisar falha de leitura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Texto da mídia": {
+      "main": [
+        [
+          {
+            "node": "Chamar Agente",
             "type": "main",
             "index": 0
           }

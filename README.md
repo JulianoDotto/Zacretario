@@ -35,6 +35,7 @@ Bot:  🗑️ Dentista cancelado.
 ## Features
 
 - Free-text messages, no command syntax. Messages with a day or time become calendar events; the rest become to-dos.
+- Voice messages, photos and PDFs: a voice note counts as typed text; a photo of an invitation or a PDF schedule is read and turned into events, after asking when there is no caption or more than one item. Forwarded voice notes and anything written inside a file are treated as data, never as commands.
 - Calendar: create, list, reschedule and cancel events, and find free slots ("I need 2h to study this week" proposes times and only books after you approve).
 - To-dos: add, list, complete and delete. Preferences such as working hours and blocked weekdays.
 - Asks before anything destructive; events with guests or organised by someone else are read-only.
@@ -50,6 +51,8 @@ WhatsApp ──► Evolution API ──► n8n ─ Entrada Whatsapp
               (same VPS,        │  normalise, ignore own/group messages,
                internal network)│  drop duplicates, look the sender up in `users`
                                 ▼
+        audio/image/PDF ─► Ler mídia: Evolution file ─► Groq Whisper | Claude (vision) ─► text
+                                ▼
                        Agente Zacretário (AI Agent, Claude)
                        ├─ to-do and preference tools ──► Postgres
                        └─ calendar tools ─► Portão de agenda (logic, no credentials)
@@ -59,11 +62,12 @@ WhatsApp ──► Evolution API ──► n8n ─ Entrada Whatsapp
 WhatsApp ◄── Evolution API ◄── reply           Erros ── alerts the owner on any failure
 ```
 
-Five workflows, exported in [workflows/](workflows/):
+Six workflows, exported in [workflows/](workflows/):
 
 | Workflow | Role |
 |---|---|
 | **Entrada Whatsapp** | Webhook from Evolution API; filters, deduplication, allowlist; calls the agent; sends the reply |
+| **Ler mídia** | Fetches audio, images and PDFs from Evolution, transcribes or extracts them, and returns text marked as "not instructions" |
 | **Agente Zacretário** | AI Agent with Claude, text-only history and 11 tools |
 | **Portão de agenda** | Calendar logic in Code nodes: builds Google Calendar API requests, read-only check, free slots |
 | **Google Agenda (por pessoa)** | The only place with Google credentials: a Switch on the person |
@@ -74,7 +78,8 @@ Everything that changes per person or per client lives in the `users` table and 
 ## Tech stack
 
 - [n8n](https://n8n.io) 2.x, self-hosted, with JavaScript Code nodes (Luxon for dates)
-- Anthropic Claude (`claude-sonnet-5-5`) through n8n's AI Agent
+- Anthropic Claude (`claude-haiku-5-5`) through n8n's AI Agent, with a Groq fallback; Claude also reads images and PDFs
+- Groq Whisper (`whisper-large-v3-turbo`) for voice messages
 - [Evolution API](https://github.com/EvolutionAPI/evolution-api) v2.3 for WhatsApp
 - Google Calendar API (OAuth per person)
 - PostgreSQL 16, Caddy 2 (HTTPS), Docker Compose on one VPS
@@ -93,8 +98,10 @@ Secrets live only in `infra/.env` on the server and in n8n's encrypted credentia
 infra/               docker-compose.yml, Caddyfile, Postgres init, SQL schema
 workflows/           exported n8n workflows (JSON)
   code/              source of every Code node
+    tests/           node --test workflows/code/tests/
   fixtures/          anonymised Evolution API payload
   prompt.md          the agent's system prompt
+  prompt-extracao.md the prompt that reads images and PDFs
   tools.md           the agent's database tools
 docs/
   setup.md           install guide, from an empty VPS

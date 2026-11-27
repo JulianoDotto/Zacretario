@@ -223,7 +223,7 @@
       }
     },
     {
-      "id": "c2bffde6-1726-4fe1-89c2-f39fd07c8493",
+      "id": "7f794479-9bfb-431d-9903-e54cf72e608f",
       "name": "Manual? (mensagem)",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
@@ -255,7 +255,7 @@
       }
     },
     {
-      "id": "2f49198f-a9bb-4d8c-91aa-82345cbf17a4",
+      "id": "19ec5b3b-edc6-40e6-91b2-524102b4027f",
       "name": "Manual? (reset)",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
@@ -287,7 +287,7 @@
       }
     },
     {
-      "id": "c749aa82-30c8-4966-a1d0-d70e74ea9318",
+      "id": "d35cbe71-91e3-47c5-8a10-64fa6bf91e26",
       "name": "Recusar",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
@@ -302,31 +302,159 @@
           "responseCode": 403
         }
       }
+    },
+    {
+      "id": "47e8e9e3-04fa-4a4e-8d9d-8caa9f40ecb9",
+      "name": "Mídia de teste",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        600
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "testes-agente-midia",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "01c43128-a408-42d7-a7d6-c626798f73f3"
+    },
+    {
+      "id": "c3089897-d077-4e58-9207-c9ee3f908495",
+      "name": "Manual? (mídia)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        224,
+        600
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "m3",
+              "leftValue": "={{ $execution.mode }}",
+              "rightValue": "test",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "30ec0699-6413-4998-a258-811edbd3d0cf",
+      "name": "Chamar Ler mídia",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        448,
+        600
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "xjs8GAoLEhaNKj5Q",
+          "cachedResultName": "Ler mídia",
+          "cachedResultUrl": "/workflow/xjs8GAoLEhaNKj5Q"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "webMessage": "={{ $json.body.webMessage }}",
+            "mediaKind": "={{ $json.body.mediaKind }}",
+            "mimetype": "={{ $json.body.mimetype }}",
+            "caption": "={{ $json.body.caption ?? null }}",
+            "isForwarded": "={{ $json.body.isForwarded === true }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "webMessage",
+              "displayName": "webMessage",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object",
+              "removed": false
+            },
+            {
+              "id": "mediaKind",
+              "displayName": "mediaKind",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "mimetype",
+              "displayName": "mimetype",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "caption",
+              "displayName": "caption",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "isForwarded",
+              "displayName": "isForwarded",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "boolean",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "each",
+        "options": {}
+      }
+    },
+    {
+      "id": "faec921f-8df1-4e68-ae0b-9c7197628f60",
+      "name": "Resposta da mídia",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        672,
+        600
+      ],
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {}
+      }
     }
   ],
   "connections": {
-    "Mensagem de teste": {
-      "main": [
-        [
-          {
-            "node": "Manual? (mensagem)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Resetar teste": {
-      "main": [
-        [
-          {
-            "node": "Manual? (reset)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Limpar dados do teste": {
       "main": [
         [
@@ -360,6 +488,17 @@
         ]
       ]
     },
+    "Mensagem de teste": {
+      "main": [
+        [
+          {
+            "node": "Manual? (mensagem)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Manual? (mensagem)": {
       "main": [
         [
@@ -378,6 +517,17 @@
         ]
       ]
     },
+    "Resetar teste": {
+      "main": [
+        [
+          {
+            "node": "Manual? (reset)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Manual? (reset)": {
       "main": [
         [
@@ -390,6 +540,46 @@
         [
           {
             "node": "Recusar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mídia de teste": {
+      "main": [
+        [
+          {
+            "node": "Manual? (mídia)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual? (mídia)": {
+      "main": [
+        [
+          {
+            "node": "Chamar Ler mídia",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Recusar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chamar Ler mídia": {
+      "main": [
+        [
+          {
+            "node": "Resposta da mídia",
             "type": "main",
             "index": 0
           }
