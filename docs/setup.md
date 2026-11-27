@@ -102,6 +102,17 @@ Evolution API is licensed under Apache 2.0 with extra conditions: keep its logo 
 
 1. In the [Claude Console](https://console.anthropic.com/settings/keys), create an API key used only by n8n (Create key → "elsewhere", name `n8n-zacretario`). Copy it once and keep it in a password manager. Set a monthly spend limit in the Console: it caps the damage if the key leaks or the bot loops.
 2. In n8n, Credentials → Create credential → **Anthropic**, paste the key and name it `Anthropic`.
+3. In the agent, the **Anthropic Chat Model** uses `claude-haiku-5-5` with Options *Thinking Mode: Adaptive* and *Effort: Low*. This was chosen by measurement: the same 15 tests passed on Sonnet 5.5 and on Haiku 5.5 (after two explicit prompt rules), at about US$ 0.0226 vs US$ 0.0012 per message. See [workflows/fixtures/testes-agente.md](../workflows/fixtures/testes-agente.md). *Prompt Caching* is set but, on this n8n version, the Console showed no cache reads or writes.
+
+## Groq (fallback)
+
+If Claude fails (no credits, overload), the AI Agent repeats the call on Groq.
+
+1. Create an account at [console.groq.com](https://console.groq.com). In **Settings → Data Controls**, enable **Global ZDR** so inputs and outputs are not stored. Create an API key named `n8n-zacretario`.
+2. In n8n, Credentials → Create credential → **Groq**, paste the key.
+3. In **AI Agent**, turn on **Enable Fallback Model** and connect a **Groq Chat Model** (`openai/gpt-oss-120b`) to the **Fallback Model** input (the second model input, not *Chat Model*).
+
+The free plan allows about 8K tokens per minute. Groq counts roughly half the tokens Anthropic does for the same prompt, so a few messages per minute fit.
 
 ## Google Calendar
 
@@ -115,7 +126,7 @@ Each person connects their own Google account. In n8n a credential is fixed on a
 
 The exported workflows are in [workflows/](../workflows/), without credentials and without pinned data.
 
-1. In n8n, import each file (Workflows → Create → Import from file), in this order: `google-agenda-por-pessoa.json`, `portao-de-agenda.json`, `erros.json`, `agente-zacretario.json`, `entrada-whatsapp.json`.
+1. In n8n, import each file (Workflows → Create → Import from file), in this order: `google-agenda-por-pessoa.json`, `portao-de-agenda.json`, `erros.json`, `agente-zacretario.json`, `entrada-whatsapp.json`. Optional, for evaluations: `medir-execucao-do-agente.json`, then `testes-do-agente.json` (point *Chamar Agente como teste* at a published copy of the agent and *Medir* at the measuring workflow; it needs an **n8n API** credential).
 2. Open every node that shows a credential warning and pick the matching credential (`Evolution API`, `Postgres Zacretário`, `Anthropic`, `Google Calendar - <Name>`).
 3. Workflows call each other by id, and imported workflows get new ids. Re-select the target workflow in: *Chamar Google* and *Chamar Google (2)* (Portão de agenda → Google Agenda (por pessoa)), the five calendar tools in the agent (→ Portão de agenda), and *Chamar Agente* (Entrada Whatsapp → Agente Zacretário). Set **Erros** as the *Error workflow* in the settings of the other four.
 4. **One branch per person** in **Google Agenda (por pessoa)**: for each person, a rule `user_key` equals `<key>` in **Qual pessoa?** and a copy of the **Agenda - Juliano** node using that person's credential. Without a branch, that person's agenda requests get "Esta pessoa ainda não conectou a agenda Google."

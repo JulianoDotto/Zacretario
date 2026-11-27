@@ -112,3 +112,25 @@ Looking back:
 - **What still needed code:** anything with real logic (dates and timezones, free slots, the read-only rule). Writing those Code nodes as files and testing them outside n8n paid off.
 - **What surprised me:** the bugs that mattered were not in the logic but at the edges — an invisible TAB in a field, a toggle that switched itself on, the AI provider's rules about memory. Error workflows and execution history are what made them cheap to find.
 - **Working style:** Claude navigated and explained; I built. When a step was repetitive (allowlist nodes, the five calendar tools), letting Claude build it through n8n's MCP server and then reading what it built was a good trade.
+
+## AI cost (2026-11-26/27)
+
+Goal: lower the cost per message before Zacretário becomes a per-client template, without making it worse. Design: [2026-11-26-custo-ia-design.md](superpowers/specs/2026-11-26-custo-ia-design.md).
+
+What was done: a test person (`teste`) with its own Google calendar; a **Testes do agente** workflow (webhook that always calls the agent as `teste`, plus a reset) and a **Medir execução do agente** sub-workflow that reads the run through the n8n API and returns only calls, tools and tokens; 15 fixed test messages with expected results ([testes-agente.md](../workflows/fixtures/testes-agente.md)). Changes were tried on a published **copy** of the agent, never on the live one.
+
+| Config | Tests | US$ / message |
+|---|---|---|
+| Sonnet 5.5, defaults | 15/15 | 0.0226 |
+| Sonnet 5.5, cache 5 min + effort low | 15/15 | ~0.0216 (cache did not apply) |
+| Haiku 5.5, effort low + 2 prompt rules | all ⚠️ pass | **0.0012 (−95%)** |
+
+Plus a **Groq** fallback (`openai/gpt-oss-120b`, free plan, Zero Data Retention) for when Claude fails, tested by pointing the copy's main model at an invalid ID.
+
+Concepts:
+- 92% of the cost was **input**: the same prompt + 10 tools (~4.6K tokens) resent on every call of the tool loop. Shorter answers barely matter.
+- "Configured" is not "working": n8n showed `cache_control` in the request, but the Anthropic Console showed zero cache reads and writes. The bill is the source of truth.
+- A smaller model follows written rules but infers fewer unwritten ones; Haiku proposed 6 a.m. outside the user's window until the rule was made explicit.
+- Rate limits are per tokens per minute, and each provider counts tokens differently (Groq ≈ half).
+
+What went wrong: reading executions through MCP returned the whole prompt each time (moved the measurement into a sub-workflow); the editor created two Groq nodes and wired one into the wrong input; n8n refuses API edits while the workflow is open in the editor (HTTP 423).

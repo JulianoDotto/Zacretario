@@ -36,9 +36,9 @@
         "workflowId": {
           "__rl": true,
           "mode": "list",
-          "value": "puG82ODOo7Idv90U",
-          "cachedResultName": "Agente Zacretário",
-          "cachedResultUrl": "/workflow/puG82ODOo7Idv90U"
+          "value": "DzbEHTWa8Hcez5V6",
+          "cachedResultName": "Agente Zacretário (teste)",
+          "cachedResultUrl": "/workflow/DzbEHTWa8Hcez5V6"
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
@@ -165,6 +165,62 @@
         "respondWith": "firstIncomingItem",
         "options": {}
       }
+    },
+    {
+      "id": "92c53dd4-45a6-4777-b834-625f2b84361c",
+      "name": "Medir",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        448,
+        -160
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "5TeW0I5NmdivlJdx",
+          "cachedResultName": "Medir execução do agente",
+          "cachedResultUrl": "/workflow/5TeW0I5NmdivlJdx"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "exec_id": "={{ $json.exec_id }}",
+            "output": "={{ $json.output }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "exec_id",
+              "displayName": "exec_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "output",
+              "displayName": "output",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
     }
   ],
   "connections": {
@@ -173,17 +229,6 @@
         [
           {
             "node": "Chamar Agente como teste",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Chamar Agente como teste": {
-      "main": [
-        [
-          {
-            "node": "Resposta",
             "type": "main",
             "index": 0
           }
@@ -206,6 +251,28 @@
         [
           {
             "node": "Resposta do reset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chamar Agente como teste": {
+      "main": [
+        [
+          {
+            "node": "Medir",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Medir": {
+      "main": [
+        [
+          {
+            "node": "Resposta",
             "type": "main",
             "index": 0
           }
