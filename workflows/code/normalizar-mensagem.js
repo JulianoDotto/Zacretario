@@ -13,7 +13,8 @@ const MEDIA_TYPES = new Set([
 // Limits for readable media. Above them the person gets a polite notice and
 // nothing is fetched. Missing metadata never blocks a message.
 const MAX_AUDIO_SECONDS = 300;
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+// Anthropic's 5 MB image limit counts the base64 text, which is 4/3 of the file.
+const MAX_IMAGE_BYTES = (5 * 1024 * 1024 * 3) / 4;
 const MAX_PDF_BYTES = 10 * 1024 * 1024;
 const MAX_PDF_PAGES = 10;
 
@@ -26,6 +27,12 @@ function toNumber(value) {
 }
 
 const over = (value, max) => value !== null && value > max;
+
+// Copy of the message without WhatsApp's preview thumbnails (base64 of the
+// picture or of the PDF's first page). Evolution does not need them to download.
+function withoutThumbnails(message) {
+  return JSON.parse(JSON.stringify(message, (k, v) => (k === 'jpegThumbnail' ? undefined : v)));
+}
 
 // Returns { mediaKind, media } for audio, images and PDFs, or null.
 function readableMedia(message) {
@@ -83,12 +90,12 @@ return {
     mediaKind: readable?.mediaKind ?? null,
     mimetype: readable ? (media.mimetype ?? null) : null,
     caption: rawCaption !== '' ? rawCaption : null,
-    // A forwarded voice note is someone else speaking: treated as data, not as a request.
+    // Forwarded media is someone else's: its voice or caption is data, not a request.
     isForwarded: media.contextInfo?.isForwarded === true || data.contextInfo?.isForwarded === true,
     tooBig: readable ? isTooBig(readable.mediaKind, media) : false,
     // Evolution does not store messages (DATABASE_SAVE_DATA_NEW_MESSAGE=false), so
     // "Ler mídia" hands it the whole message: the media keys let it download and decrypt.
-    webMessage: readable ? { key, message } : null,
+    webMessage: readable ? { key, message: withoutThumbnails(message) } : null,
     // Reactions, edits, deletions, poll votes and other events: no reply at all.
     ignore: !isText && !isMedia,
   },

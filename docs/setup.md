@@ -122,7 +122,7 @@ The workflow **Ler mídia** reads what people send besides text:
 - **Images and PDFs** go to two **Anthropic** nodes (*image/analyze* and *document/analyze*, `claude-haiku-5-5`) with the extraction prompt in [workflows/prompt-extracao.md](../workflows/prompt-extracao.md).
 - The file is fetched from Evolution (`/chat/getBase64FromMediaMessage`) with the whole message, because Evolution is set not to store messages and cannot find one by id.
 
-In its settings, keep **Save successful production executions: off** (only failures are kept, for debugging) and **Error workflow: Erros**. Limits (5 min of audio, 5 MB per image, 10 pages or 10 MB per PDF) live in the `Normalizar mensagem` Code node.
+In its settings, keep **Save successful production executions: off** (only failures are kept, for debugging) and **Error workflow: Erros**. Limits (5 min of audio, 3.75 MB per image (Anthropic's 5 MB limit counts the base64 text), 10 pages or 10 MB per PDF) live in the `Normalizar mensagem` Code node.
 
 ## Google Calendar
 

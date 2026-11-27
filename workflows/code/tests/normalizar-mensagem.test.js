@@ -144,3 +144,33 @@ test('texto e mídia ilegível não trazem webMessage', () => {
   item.body.data.message = { videoMessage: { mimetype: 'video/mp4' } };
   assert.equal(run(item).webMessage, null);
 });
+
+test('webMessage não leva a miniatura (jpegThumbnail) da imagem', () => {
+  const item = fixture('messages-upsert-imagem.json');
+  msg(item).imageMessage.jpegThumbnail = { 0: 255, 1: 216 };
+  const out = run(item);
+  assert.equal(out.webMessage.message.imageMessage.jpegThumbnail, undefined);
+  assert.equal(out.webMessage.message.imageMessage.caption, 'Coloca na agenda');
+  // the original webhook item is not mutated
+  assert.ok(msg(item).imageMessage.jpegThumbnail);
+});
+
+test('webMessage não leva a miniatura do PDF dentro de documentWithCaptionMessage', () => {
+  const item = fixture('messages-upsert-pdf.json');
+  const doc = { ...msg(item).documentMessage, jpegThumbnail: { 0: 1 } };
+  item.body.data.message = { documentWithCaptionMessage: { message: { documentMessage: doc } } };
+  const out = run(item);
+  assert.equal(out.webMessage.message.documentWithCaptionMessage.message.documentMessage.jpegThumbnail, undefined);
+});
+
+test('imagem de 4 MB é grande demais (limite de 3,75 MB por causa do base64)', () => {
+  const item = fixture('messages-upsert-imagem.json');
+  msg(item).imageMessage.fileLength = { low: 4 * 1024 * 1024, high: 0, unsigned: true };
+  assert.equal(run(item).tooBig, true);
+});
+
+test('imagem de 3,5 MB ainda passa', () => {
+  const item = fixture('messages-upsert-imagem.json');
+  msg(item).imageMessage.fileLength = { low: 3.5 * 1024 * 1024, high: 0, unsigned: true };
+  assert.equal(run(item).tooBig, false);
+});
