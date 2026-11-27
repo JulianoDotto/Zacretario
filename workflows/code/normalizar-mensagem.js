@@ -86,6 +86,9 @@ return {
     // A forwarded voice note is someone else speaking: treated as data, not as a request.
     isForwarded: media.contextInfo?.isForwarded === true || data.contextInfo?.isForwarded === true,
     tooBig: readable ? isTooBig(readable.mediaKind, media) : false,
+    // Evolution does not store messages (DATABASE_SAVE_DATA_NEW_MESSAGE=false), so
+    // "Ler mídia" hands it the whole message: the media keys let it download and decrypt.
+    webMessage: readable ? { key, message } : null,
     // Reactions, edits, deletions, poll votes and other events: no reply at all.
     ignore: !isText && !isMedia,
   },

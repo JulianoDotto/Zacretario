@@ -122,3 +122,25 @@ test('legenda só de espaços vira null', () => {
   msg(item).imageMessage.caption = '   ';
   assert.equal(run(item).caption, null);
 });
+
+test('mídia legível traz webMessage com key e message', () => {
+  const item = fixture('messages-upsert-audio.json');
+  const out = run(item);
+  assert.deepEqual(out.webMessage.key, item.body.data.key);
+  assert.equal(out.webMessage.message.audioMessage.seconds, 3);
+});
+
+test('mensagem efêmera: webMessage leva a mensagem já desembrulhada', () => {
+  const item = fixture('messages-upsert-imagem.json');
+  item.body.data.message = { ephemeralMessage: { message: item.body.data.message } };
+  const out = run(item);
+  assert.equal(out.mediaKind, 'image');
+  assert.ok(out.webMessage.message.imageMessage);
+});
+
+test('texto e mídia ilegível não trazem webMessage', () => {
+  assert.equal(run(fixture('messages-upsert-texto.json')).webMessage, null);
+  const item = fixture('messages-upsert-audio.json');
+  item.body.data.message = { videoMessage: { mimetype: 'video/mp4' } };
+  assert.equal(run(item).webMessage, null);
+});

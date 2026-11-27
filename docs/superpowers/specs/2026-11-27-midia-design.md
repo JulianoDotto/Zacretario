@@ -67,8 +67,8 @@ Entrada Whatsapp
                                     └ não ─► Avisar só texto
 ```
 
-- **Evolution:** o **Webhook Base64 continua off**. O conteúdo só é pedido **depois** da allowlist, dentro de *Ler mídia*, pela rota interna `POST /chat/getBase64FromMediaMessage/zacretario` (com o `messageId`). Assim, mídia de desconhecidos e de grupos nunca é processada, e um vídeo grande não chega ao webhook. Nada é gravado em disco.
-- **Ler mídia** (sub-workflow novo, recebe `messageId`, `mediaKind`, `mimetype`, `caption`, `isForwarded` e o tamanho, e devolve `text`):
+- **Evolution:** o **Webhook Base64 continua off**. O conteúdo só é pedido **depois** da allowlist, dentro de *Ler mídia*, pela rota interna `POST /chat/getBase64FromMediaMessage/zacretario`. Como a Evolution não guarda mensagens (`DATABASE_SAVE_DATA_NEW_MESSAGE=false`), ela recebe a **mensagem inteira** do webhook (`webMessage` = `{key, message}`), cujas chaves de mídia permitem baixar e decifrar o arquivo. *(Ajuste da execução: a primeira versão mandava só o `messageId` e a Evolution respondia "Message not found".)* Assim, mídia de desconhecidos e de grupos nunca é processada, e um vídeo grande não chega ao webhook. Nada é gravado em disco.
+- **Ler mídia** (sub-workflow novo, recebe `webMessage`, `mediaKind`, `mimetype`, `caption`, `isForwarded` e o tamanho, e devolve `text`):
   - Primeiro confere o tamanho pelos metadados. Se passar do limite, devolve o aviso sem buscar o conteúdo.
   - Depois busca o base64 na Evolution.
   - `audio` → Groq Whisper (`whisper-large-v3-turbo`, idioma pt) → `text` = a transcrição.
