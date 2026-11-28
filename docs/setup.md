@@ -161,7 +161,7 @@ Only people in the `users` table get an answer.
 
 ## Test n8n (for the Kanban agent)
 
-A second n8n, `n8n-teste`, runs on the same server for the Kanban agent ([docs/superpowers/specs/2026-11-28-kanban-trello-design.md](superpowers/specs/2026-11-28-kanban-trello-design.md)). It has its own databases (`n8n_teste`, `zacretario_teste`), its own encryption key and its own credentials, and no WhatsApp: nothing in it can reach production data.
+A second n8n, `n8n-teste`, runs on the same server for the Kanban agent ([docs/superpowers/specs/2026-11-28-kanban-trello-design.md](superpowers/specs/2026-11-28-kanban-trello-design.md)). It has its own databases (`n8n_teste`, `zacretario_teste`), its own encryption key and its own credentials, and no WhatsApp. It also has its own Docker network (`teste`), shared only with Postgres and Caddy: it cannot reach production n8n's internal webhooks (`http://n8n:5678/...`, where the WhatsApp entry lives) or Evolution API, and community packages are disabled on it. Changing a service's networks recreates its container, so applying this on a running server takes Postgres and Caddy down for a few seconds.
 
 1. **DNS.** An `A` record `teste` pointing to the server's IP. Caddy gets the certificate by itself on the first request, so the record must exist first.
 2. **Secrets.** In `/opt/zacretario/infra/.env`, add `N8N_TESTE_DB_PASSWORD`, `ZACRETARIO_TESTE_DB_PASSWORD` and `N8N_TESTE_ENCRYPTION_KEY`, each with a new `openssl rand -hex 32`, never the production values.

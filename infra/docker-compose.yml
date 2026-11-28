@@ -25,7 +25,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    # No published port: only containers on this network reach Postgres.
+    # No published port: only containers on these networks reach Postgres.
+    networks: [default, teste]
 
   n8n:
     image: n8nio/n8n:2.49.6
@@ -54,8 +55,10 @@ services:
     # No published port: Caddy reaches n8n at n8n:5678.
 
   # Test copy of n8n for the Kanban agent (docs/kanban.md). Same image as n8n,
-  # but its own databases, encryption key and credentials: nothing here can
-  # reach production data. No Evolution API: workflows run by hand or by tests.
+  # but its own databases, encryption key and credentials. It lives on its own
+  # network with only Postgres and Caddy, so it cannot call production n8n's
+  # internal webhooks or Evolution API. No community packages: the agent drives
+  # this instance, and a package runs arbitrary code inside it.
   n8n-teste:
     image: n8nio/n8n:2.49.6
     restart: unless-stopped
@@ -78,9 +81,11 @@ services:
       EXECUTIONS_DATA_PRUNE: "true"
       EXECUTIONS_DATA_MAX_AGE: 336 # hours (14 days)
       N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_COMMUNITY_PACKAGES_ENABLED: "false"
     volumes:
       - n8n_teste_data:/home/node/.n8n
     # No published port: Caddy reaches it at n8n-teste:5678.
+    networks: [teste]
 
   evolution:
     image: evoapicloud/evolution-api:v2.3.8
@@ -128,6 +133,12 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+    networks: [default, teste]
+
+networks:
+  default: {}
+  # Only n8n-teste, Postgres and Caddy.
+  teste: {}
 
 volumes:
   pgdata:
