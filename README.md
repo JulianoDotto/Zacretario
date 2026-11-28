@@ -99,12 +99,15 @@ infra/               docker-compose.yml, Caddyfile, Postgres init, SQL schema
 workflows/           exported n8n workflows (JSON)
   code/              source of every Code node
     tests/           node --test workflows/code/tests/
-  fixtures/          anonymised Evolution API payload
+  fixtures/          anonymised Evolution API and Trello payloads
   prompt.md          the agent's system prompt
   prompt-extracao.md the prompt that reads images and PDFs
   tools.md           the agent's database tools
+.github/             the Kanban agent (GitHub Actions workflow, prompt, MCP config)
+.claude/skills/      novo-card and testar-card, the Kanban skills for Claude Code
 docs/
   setup.md           install guide, from an empty VPS
+  kanban.md          the Trello board, the listener and the agent
   why-n8n-evolution.md
   learning-log.md    what each stage taught, and what went wrong
   future-improvements.md
@@ -121,6 +124,17 @@ Both versions followed the same AI-assisted process with Claude Code:
 4. **Implementation.** v1 was written by Claude Code subagents, each task reviewed before the next. The n8n version was built as a guided walkthrough: Claude navigated the browser and explained each step, and I built the workflows myself in the n8n editor, with Claude writing the Code nodes and some nodes through n8n's MCP server when I asked it to.
 
 [docs/learning-log.md](docs/learning-log.md) records each stage of the n8n build: what was done, the n8n concept behind it, and what went wrong (including a memory bug with Claude's signed thinking blocks that only showed up in long conversations).
+
+## How it changes now: a Kanban board
+
+New features go through a Trello board ([docs/kanban.md](docs/kanban.md)):
+
+1. **Backlog.** A brainstorm in Claude Code ends with the `novo-card` skill, which writes a card: user story, acceptance criteria, a development guide that names only real workflows and files, and a checklist.
+2. **Em andamento.** Dragging the card there makes the production n8n (*Kanban: card movido*) start a Claude agent on GitHub Actions, one card at a time. The agent builds the change in a test copy of n8n with the same workflow IDs, exports the JSON, and opens a pull request.
+3. **Para teste.** The `testar-card` skill walks through each criterion in the test n8n, including the ones the agent ticked itself.
+4. **Pronto.** After the merge, the workflow is promoted from the test n8n to production with the same ID, and the card moves on.
+
+The first card, a daily job that deletes conversation text after 48 hours ([PR #4](https://github.com/JulianoDotto/Zacretario/pull/4)), went through the whole loop. The agent's limits, the defences against a hostile card and what went wrong while setting it up are in [docs/kanban.md](docs/kanban.md#the-agent).
 
 ## Scope note
 

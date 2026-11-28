@@ -29,6 +29,10 @@ const queued = (c) => c.labels.includes(NA_FILA);
 const byPos = (a, b) => a.pos - b.pos;
 const actionCard = cards.find((c) => c.id === cardId);
 
+// A card that is not open on this board (a forged webhook, or one archived
+// meanwhile) never starts the agent or touches the queue.
+if (!actionCard) return out(null, null, null, 'Card fora do quadro.');
+
 // The slot is taken by someone else: a card in "Para teste", or a dispatched
 // card still in "Em andamento" (running or "Bloqueado").
 const others = cards.filter((c) => c.id !== cardId);
