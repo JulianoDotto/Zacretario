@@ -159,6 +159,19 @@ Only people in the `users` table get an answer.
 
 **Test person.** Agent evaluations run as the person `teste`, never as a real user: a fake `whatsapp_id` (`teste-sem-whatsapp`, so the bot never answers it) and its own Google calendar, "Zacretário teste", created in the owner's account. Put that calendar's ID (Google Calendar → Settings → the calendar → *Integrate calendar*) in `calendar_id` (see the end of [seed.example.sql](../infra/sql/seed.example.sql)), and in **Google Agenda (por pessoa)** connect the rule `teste` to the owner's node: same credential, different calendar.
 
+## Test n8n (for the Kanban agent)
+
+A second n8n, `n8n-teste`, runs on the same server for the Kanban agent ([docs/superpowers/specs/2026-11-28-kanban-trello-design.md](superpowers/specs/2026-11-28-kanban-trello-design.md)). It has its own databases (`n8n_teste`, `zacretario_teste`), its own encryption key and its own credentials, and no WhatsApp: nothing in it can reach production data.
+
+1. **DNS.** An `A` record `teste` pointing to the server's IP. Caddy gets the certificate by itself on the first request, so the record must exist first.
+2. **Secrets.** In `/opt/zacretario/infra/.env`, add `N8N_TESTE_DB_PASSWORD`, `ZACRETARIO_TESTE_DB_PASSWORD` and `N8N_TESTE_ENCRYPTION_KEY`, each with a new `openssl rand -hex 32`, never the production values.
+3. **Databases.** `postgres/init.sh` only runs on an empty volume, so on a server that already runs create them by hand, with the same `CREATE ROLE` / `CREATE DATABASE` as the script (load `.env` first with `set -a; . ./.env; set +a`, and pass the password as `psql -v password="$N8N_TESTE_DB_PASSWORD"`). Then apply `sql/001_schema.sql` and `sql/002_conversation.sql` to `zacretario_teste` as the user `zacretario_teste`.
+4. **Start.** `docker compose up -d n8n-teste`, then `docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile` (no downtime).
+   Changing the `environment` of `postgres` (as adding the two passwords does) makes `up` recreate Postgres too: production loses its database connection for about ten seconds. Do it at a quiet hour.
+5. **Owner and MCP.** Open `https://teste.<domain>`, create the owner account (its own password), and turn on **Settings → Instance-level MCP**. To use it from Claude Code: `claude mcp add --transport http --scope user n8n-teste https://teste.<domain>/mcp-server/http`, then authenticate in `/mcp`.
+
+The WhatsApp entry webhook is closed in Caddy for `teste.<domain>` too, so a fake message from the internet cannot spend test API credits.
+
 ## Updating
 
 Images are pinned. To update one, change its tag in `infra/docker-compose.yml`, copy the file to the server, and run `docker compose pull <service> && docker compose up -d <service>`. Read the release notes first, especially for Evolution API.
