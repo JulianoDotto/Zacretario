@@ -45,6 +45,8 @@
 
 ### Task 1: Subir o n8n-teste
 
+*(Na execução: o Caddyfile também fecha o webhook do WhatsApp no teste; o `up` recriou o Postgres da produção por ~10 s, porque o `environment` dele mudou — ver `docs/setup.md`.)*
+
 **Arquivos:**
 - Modificar: `infra/docker-compose.yml` (serviço `n8n-teste` e volume `n8n_teste_data`), `infra/Caddyfile` (bloco `teste.{$DOMAIN}`), `infra/postgres/init.sh` (apps `n8n_teste` e `zacretario_teste`), `infra/.env.example` (`N8N_TESTE_DB_PASSWORD`, `N8N_TESTE_ENCRYPTION_KEY`, `ZACRETARIO_TESTE_DB_PASSWORD`)
 - Modificar: `docs/setup.md` (seção nova "Ambiente de teste (n8n-teste)")
@@ -52,15 +54,15 @@
 **Interfaces:**
 - Produz: o n8n-teste em `https://teste.dotton8n.com.br`, alcançável na rede Docker como `n8n-teste:5678`, com MCP ligado e um token (que vai para o segredo `N8N_TESTE_MCP_TOKEN` na Task 7).
 
-- [ ] **Passo 1:** acrescentar o serviço `n8n-teste`, copiando o `n8n` e mudando banco, usuário, senha, chave, `N8N_HOST: teste.${DOMAIN}` e `WEBHOOK_URL`. Mantenha `EXECUTIONS_DATA_MAX_AGE` e os demais valores iguais.
-- [ ] **Passo 2:** no `Caddyfile`, um bloco `teste.{$DOMAIN}` com `reverse_proxy n8n-teste:5678`.
-- [ ] **Passo 3:** no `init.sh`, incluir `n8n_teste` e `zacretario_teste` no laço (para instalações novas).
-- [ ] **Passo 4: DNS.** Registro `A` `teste` → `2.24.99.30` na zona `dotton8n.com.br` (MCP da Hostinger, com o "sim" do usuário).
-- [ ] **Passo 5: Na VPS** (o usuário digita os segredos no `infra/.env` do servidor): gerar as senhas e a chave novas, criar os dois bancos à mão (o `init.sh` não roda de novo num volume que já existe), com `docker compose exec postgres psql -U postgres` e o mesmo `CREATE ROLE … / CREATE DATABASE …` do script. Depois aplicar `infra/sql/001_schema.sql` e `002_conversation.sql` no `zacretario_teste`, mais um seed de teste sem dados reais.
-- [ ] **Passo 6:** `docker compose up -d n8n-teste caddy`.
-- [ ] **Passo 7:** criar a conta de dono do n8n-teste (o usuário, com senha própria) e ligar o MCP com um token (o usuário guarda no gerenciador de senhas).
-- [ ] **Passo 8: Conferir.** `https://teste.dotton8n.com.br` abre o login com certificado válido. A produção continua respondendo: `docker compose ps` mostra tudo `running`, e uma mensagem real ao bot recebe resposta. Pelo MCP da Hostinger, a RAM da VPS continua abaixo de 3 GB.
-- [ ] **Passo 9:** documentar na seção nova do `docs/setup.md` e fazer commit: `feat(infra): n8n-teste, a second n8n for the Kanban agent`.
+- [x] **Passo 1:** acrescentar o serviço `n8n-teste`, copiando o `n8n` e mudando banco, usuário, senha, chave, `N8N_HOST: teste.${DOMAIN}` e `WEBHOOK_URL`. Mantenha `EXECUTIONS_DATA_MAX_AGE` e os demais valores iguais.
+- [x] **Passo 2:** no `Caddyfile`, um bloco `teste.{$DOMAIN}` com `reverse_proxy n8n-teste:5678`.
+- [x] **Passo 3:** no `init.sh`, incluir `n8n_teste` e `zacretario_teste` no laço (para instalações novas).
+- [x] **Passo 4: DNS.** Registro `A` `teste` → `2.24.99.30` na zona `dotton8n.com.br` (MCP da Hostinger, com o "sim" do usuário).
+- [x] **Passo 5: Na VPS** (o usuário digita os segredos no `infra/.env` do servidor): gerar as senhas e a chave novas, criar os dois bancos à mão (o `init.sh` não roda de novo num volume que já existe), com `docker compose exec postgres psql -U postgres` e o mesmo `CREATE ROLE … / CREATE DATABASE …` do script. Depois aplicar `infra/sql/001_schema.sql` e `002_conversation.sql` no `zacretario_teste`, mais um seed de teste sem dados reais.
+- [x] **Passo 6:** `docker compose up -d n8n-teste caddy`.
+- [x] **Passo 7:** criar a conta de dono do n8n-teste (o usuário, com senha própria) e ligar o MCP com um token (o usuário guarda no gerenciador de senhas).
+- [x] **Passo 8: Conferir.** `https://teste.dotton8n.com.br` abre o login com certificado válido. A produção continua respondendo: `docker compose ps` mostra tudo `running`, e uma mensagem real ao bot recebe resposta. Pelo MCP da Hostinger, a RAM da VPS continua abaixo de 3 GB.
+- [x] **Passo 9:** documentar na seção nova do `docs/setup.md` e fazer commit: `feat(infra): n8n-teste, a second n8n for the Kanban agent`.
 
 ### Task 2: Copiar os workflows para o teste, com os mesmos IDs
 
