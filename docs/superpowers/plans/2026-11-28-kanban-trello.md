@@ -128,7 +128,7 @@
   
   e devolve `{ dispatch: string|null, queue: string|null, unqueue: string|null, reason: string }`.
 
-- [ ] **Passo 1: Escrever os testes que falham** em `kanban-decidir.test.js`:
+- [x] **Passo 1: Escrever os testes que falham** em `kanban-decidir.test.js`:
   - `vaga livre`: card A entra em `Em andamento` e nenhum outro está em `Em andamento`/`Para teste` → `dispatch: A`, `queue: null`.
   - `vaga ocupada por card em teste`: B em `Para teste`, A entra em `Em andamento` → `dispatch: null`, `queue: A`.
   - `vaga ocupada por card bloqueado`: B em `Em andamento` com `Bloqueado` e em `dispatched`, A entra → `queue: A`.
@@ -142,10 +142,10 @@
   - `movimento fora da vaga`: de `Backlog` para `Pronto` → tudo `null`.
   - `webhook repetido`: `action.id` está em `seenActionIds` → tudo `null` e `reason: "duplicate"`.
   - `ação que não é mudança de lista` (comentário, etiqueta) → tudo `null`.
-- [ ] **Passo 2: Rodar e ver falhar.** `node --test workflows/code/tests/`. Esperado: FAIL nos testes novos e PASS nos antigos.
-- [ ] **Passo 3: Implementar `kanban-decidir.js`.** Ignorando o próprio card da ação, a vaga está ocupada se houver card em `Para teste` ou um card de `dispatched` ainda em `Em andamento`. Se a vaga estiver livre, o card da ação só é disparado se tiver o menor `pos` entre os cards de `Em andamento` sem `Na fila`; senão, vai para a fila. Na liberação, o próximo é o `Na fila` de menor `pos`. Os nomes das listas e das etiquetas ficam em constantes no topo.
-- [ ] **Passo 4: Rodar e ver passar.** `node --test workflows/code/tests/`. Esperado: todos PASS.
-- [ ] **Passo 5:** commit: `feat: kanban-decidir enforces one card at a time`.
+- [x] **Passo 2: Rodar e ver falhar.** `node --test workflows/code/tests/`. Esperado: FAIL nos testes novos e PASS nos antigos.
+- [x] **Passo 3: Implementar `kanban-decidir.js`.** Ignorando o próprio card da ação, a vaga está ocupada se houver card em `Para teste` ou um card de `dispatched` ainda em `Em andamento`. Se a vaga estiver livre, o card da ação só é disparado se tiver o menor `pos` entre os cards de `Em andamento` sem `Na fila`; senão, vai para a fila. Na liberação, o próximo é o `Na fila` de menor `pos`. Os nomes das listas e das etiquetas ficam em constantes no topo.
+- [x] **Passo 4: Rodar e ver passar.** `node --test workflows/code/tests/`. Esperado: todos PASS. *(Na execução: 52 de 52. Entraram mais quatro testes: volta de `Para teste` para `Em andamento` dispara de novo, que é o caminho do card reprovado na Task 8; `Em andamento` → `Para teste` não mexe na vaga; a liberação não dispara se outro card ainda segura a vaga; e um card `Na fila` que sai de `Em andamento` perde a etiqueta, que é a conferência da Task 6. A fixture `trello-update-card.json` fica para o Passo 5 da Task 6, que a tira de uma execução real.)*
+- [x] **Passo 5:** commit: `feat: kanban-decidir enforces one card at a time`.
 
 ### Task 6: Workflow *Kanban: card movido* (n8n de produção)
 
