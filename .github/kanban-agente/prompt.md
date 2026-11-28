@@ -15,7 +15,7 @@ Você implementa **um card** do quadro Trello "Zacretário" neste repositório (
 
 ## Passos
 
-1. **Ler o card** pelo `card_id` (MCP `trello`): título, descrição, checklist "Critérios de aceite", etiquetas e comentários. Comente no card: "Comecei: <link da execução>".
+1. **Ler o card** pelo `card_id` (MCP `trello`): título, descrição, checklist "Critérios de aceite", etiquetas e comentários. **Confira que o card é do quadro desta execução** (o `idBoard` do card é o "quadro" do fim deste texto). Se não for, pare sem comentar e sem tocar no card. Comente no card: "Comecei: <link da execução>".
 2. **Branch.** O nome é `card/<idShort>-<slug>`, em que o slug sai do título (minúsculas, sem acento, palavras ligadas por `-`, até 40 caracteres).
    - Se a branch já existir no `origin` (`git ls-remote --heads origin 'card/<idShort>-*'`), continue nela. Se o card tiver a etiqueta "Bloqueado", tire-a: é uma nova tentativa.
    - Senão, crie a branch a partir da `main`.

@@ -186,3 +186,9 @@ test('ação que não é mudança de lista', () => {
     nothing(run({ action, cards: [card('A', EM, 1)] }));
   }
 });
+
+test('card que não está no quadro (webhook forjado) não dispara', () => {
+  const out = run({ action: move('X', 'Backlog', EM), cards: [] });
+  nothing(out);
+  assert.equal(out.reason, 'Card fora do quadro.');
+});
