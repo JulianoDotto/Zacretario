@@ -170,6 +170,13 @@ A second n8n, `n8n-teste`, runs on the same server for the Kanban agent ([docs/s
    Changing the `environment` of `postgres` (as adding the two passwords does) makes `up` recreate Postgres too: production loses its database connection for about ten seconds. Do it at a quiet hour.
 5. **Owner and MCP.** Open `https://teste.<domain>`, create the owner account (its own password), and turn on **Settings → Instance-level MCP**. To use it from Claude Code: `claude mcp add --transport http --scope user n8n-teste https://teste.<domain>/mcp-server/http`, then authenticate in `/mcp`.
 
+6. **Copy production into it, keeping the IDs.** Workflows call each other by ID and nodes point to credentials by ID, so the test copy must use the same IDs: then a workflow changed and tested here imports back into production with no edits.
+   - **Credentials:** import a JSON list of `{"id", "name", "type", "data": {}}` with the production IDs and names (`docker compose cp` it into `n8n-teste`, then `n8n import:credentials --input=...`), and fill in the test values in the editor: Postgres → `zacretario_teste`, n8n API → Base URL `http://n8n-teste:5678/api/v1` and a key from the test n8n, new Anthropic and Groq keys named `n8n-teste`. **Evolution API keeps a fake key on purpose**: `n8n-teste` is on the same Docker network as Evolution, and the real key would let it send real WhatsApp messages. Credentials of other people (another person's Google) stay empty: they exist only so the workflows can be published.
+   - **Workflows:** `n8n export:workflow --all --separate --output=/tmp/wf/` in `n8n`, `docker compose cp` the folder out and into `n8n-teste`, then `n8n import:workflow --separate --input=/tmp/wf`. They arrive unpublished. Publish the sub-workflows (sub-workflows run their published version); leave **Entrada Whatsapp** and **Testes do agente** unpublished.
+   - **Test person:** copy the `teste` rows with `COPY (SELECT * FROM users WHERE key='teste') TO STDOUT` from `zacretario` piped into `COPY users FROM STDIN` on `zacretario_teste` (and the same for `preferences`).
+   - Delete the temporary files in the server and in both containers afterwards (`docker compose exec -u root ... rm`).
+7. **Promote a change back.** `n8n export:workflow --id=<id>` in `n8n-teste`, copy it into `n8n`, `n8n import:workflow --input=...` (it replaces the workflow with the same ID and unpublishes it), then publish it. The previous version stays in the workflow's history.
+
 The WhatsApp entry webhook is closed in Caddy for `teste.<domain>` too, so a fake message from the internet cannot spend test API credits.
 
 ## Updating

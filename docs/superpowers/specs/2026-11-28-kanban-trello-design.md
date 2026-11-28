@@ -132,6 +132,7 @@ No **modo copiloto**, como o resto do projeto. O Juliano executa as etapas com o
 Ordem natural (o plano detalha): merge da `feat/n8n` → n8n-teste → MCP do Trello e quadro → skill `novo-card` → escuta no n8n → agente no Actions → skill `testar-card` → um card de verdade ponta a ponta.
 
 ## 7. Riscos aceitos
+- **Google do teste é a conta do Juliano** (decisão dele, 28/11/2026). A credencial "Google Calendar - Juliano" do n8n-teste autoriza a conta pessoal, e a pessoa `teste` só usa a agenda "Zacretário teste". Como o agente tem acesso total ao n8n-teste, ele **poderia** montar um workflow que lê as agendas reais. A alternativa recusada era uma conta Google só de teste, com apenas a agenda de teste compartilhada. O prompt do agente (5.3) proíbe ler agendas que não sejam a de teste.
 - O agente consome a cota da assinatura do Claude. Os limites da 5.3 seguram o pior caso.
 - O n8n-teste pode ficar diferente da produção com o tempo. A skill `testar-card` avisa quando o workflow do PR partiu de uma versão antiga.
 - A qualidade do que o agente entrega depende do card. Um card ruim gera PR ruim, e o teste pega.
