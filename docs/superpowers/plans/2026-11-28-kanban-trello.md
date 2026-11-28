@@ -110,8 +110,8 @@
 
 - [x] **Passo 1:** escrever o `modelo-card.md` com as seções exatas acima.
 - [x] **Passo 2:** escrever o `SKILL.md`. Ele é chamado no fim de um brainstorming aprovado, mostra o card montado e só cria no Trello depois do "sim". Depois de criar, devolve o link do card. O guia de desenvolvimento cita só o que existe no repositório (nomes reais de workflow e arquivo).
-- [ ] **Passo 3: Conferir.** Numa sessão nova, `/novo-card` para uma melhoria pequena e real, escolhida com o usuário, cria o card no `Backlog` com a checklist. Esse card serve de ponta a ponta na Task 8.
-- [ ] **Passo 4:** commit: `feat: novo-card skill creates Backlog cards from a brainstorm`.
+- [x] **Passo 3: Conferir.** Numa sessão nova, `/novo-card` para uma melhoria pequena e real, escolhida com o usuário, cria o card no `Backlog` com a checklist. Esse card serve de ponta a ponta na Task 8. *(Na execução: a skill apareceu na mesma sessão, sem precisar de outra. Card #1 "Apagar conversas e IDs de mensagem antigos todo dia" (`https://trello.com/c/FhLiweqP`): workflow novo `Limpeza diária` que apaga a conversa com mais de 48 h e os IDs de mensagem com mais de 7 dias, com 6 critérios. Conferido com `get_card`: 5 seções, 6 itens na checklist, no `Backlog`, sem etiquetas.)*
+- [x] **Passo 4:** commit: `feat: novo-card skill creates Backlog cards from a brainstorm`.
 
 ### Task 5: Regra "um card por vez" (`kanban-decidir.js`, com testes)
 
