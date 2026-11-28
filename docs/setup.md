@@ -185,6 +185,7 @@ The board and the agent are described in [kanban.md](kanban.md).
 
 1. **Board.** A private board `Zacretário` with the lists `Backlog`, `Em andamento`, `Para teste`, `Pronto` (in this order) and the labels `Bloqueado` and `Na fila`.
 2. **API key and token.** At [trello.com/power-ups/admin](https://trello.com/power-ups/admin), create an app that **doesn't use Power-up capabilities** (otherwise an iframe URL is required). Under **Authorization → Trello Auth**, generate the API key, then the token. Keep both in a password manager: together they act as your Trello user, on all your boards. OAuth 2.0 on that page is not used.
+   **For GitHub Actions, use a bot account instead:** create a second Trello account, invite it to the `Zacretário` board only (as a member), and generate its own key and token the same way while logged in as the bot. Those go into the `TRELLO_API_KEY` and `TRELLO_TOKEN` repository secrets, so a leak from the agent reaches this board and nothing else.
 3. **Claude Code.** Add the MCP server with the values typed in the command itself (on Windows `npx` runs through `cmd /c`):
 
    ```powershell

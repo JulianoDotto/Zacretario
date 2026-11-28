@@ -47,16 +47,24 @@ Labels: **Bloqueado** (the agent stopped and says why in a comment) and **Na fil
 
 **Layers of defence**, because the card text becomes instructions:
 
-1. Only Juliano writes on the board, which is private.
+1. Only Juliano writes on the board, which is private. The listener ignores any card that is not open on it (a forged webhook), and the agent checks the card's board before starting.
 2. The prompt treats the card as a spec, not an authority: no secrets, no production, no merge, no `.github/` changes, one command at a time.
-3. `--allowedTools` limits the shell to `git`, `gh pr`, `gh api` and `node --test`, and each part of a chained command is checked on its own. This is not a sandbox (git options and test files can run code), so it is a layer, not the wall.
-4. GitHub masks secrets as `***` in the public log, and `show_full_output` stays off, so tool results are not printed.
-5. Merging is Juliano's, after reading the pull request.
+3. `--allowedTools` limits the shell to `git`, `gh pr create/view/edit/list` and `node --test`, and each part of a chained command is checked on its own; `install_community_node` is denied. This is not a sandbox (git options and test files can run code), so it is a layer, not the wall.
+4. The agent's Trello key and token belong to a **bot account that is a member of this board only**, so a leak cannot reach Juliano's other boards. Its comments are signed by the bot.
+5. **n8n-teste has its own Docker network** with only Postgres and Caddy: it cannot call production n8n (where the WhatsApp entry webhook lives) or Evolution API.
+6. GitHub masks secrets as `***` in the public log, and `show_full_output` stays off, so tool results are not printed.
+7. **Merging is Juliano's, and GitHub enforces it**: the `main` ruleset requires one approval, the bot cannot approve its own pull request, and only the repository admin may bypass (for his own pull requests).
 
-The action is pinned by commit SHA (`claude-code-action` v1.0.290), `card_id` is validated (24 hex characters) and reaches the shell only through `env:`, and each run is limited to 60 minutes and 80 turns, one at a time (`concurrency`).
+Actions are pinned by commit SHA (`claude-code-action` v1.0.290, `checkout`, `setup-node`), `card_id` is validated (24 hex characters) and reaches the shell only through `env:`, and each run is limited to 60 minutes and 80 turns, one at a time (`concurrency`). GitHub keeps only one pending run per concurrency group, so a third dispatch while one runs cancels the waiting one.
 
-**Reading a run.** The last step, *Ferramentas negadas*, lists each tool the allowlist blocked, with only its command or file. A few denials are normal (the agent tries a shortcut such as `node -e` and falls back); the same denial on every run means the prompt or the allowlist needs a change.
+**When a run dies.** If the run fails or is cancelled before the agent reports (timeout, turn limit, an expired token, the billing lock below), the last step marks the card **Bloqueado** with the run link, so it never holds the slot in silence. To retry, move the card out of **Em andamento** and back. Archiving the card that holds the slot frees it only at the next list move on the board.
+
+**Reading a run.** The step *Ferramentas negadas* lists each tool the allowlist blocked, with only its name and the first word of the command (or the file). A few denials are normal (the agent tries a shortcut such as `node -e` and falls back); the same denial on every run means the prompt or the allowlist needs a change.
 
 **Checked on 28/11/2026:** a real card went from **Em andamento** to **Para teste** with its pull request in about 90 seconds; a card asking for `TRELLO_TOKEN` in the pull request was refused and blocked; a card whose test cannot pass was blocked and stayed in **Em andamento**. No secret appeared in any log.
+
+**Promotion** goes from n8n-teste to production with an export/import that keeps the workflow ID, not from the JSON in the repository: production and n8n-teste have a branch and a credential for a real person that the public repository leaves out. The repository JSON is the reviewed record of the change; the `testar-card` skill checks that it matches n8n-teste before testing.
+
+**Accepted risks.** `npx atlassian-trello-mcp@1.7.2` pins the package, not its dependencies, which resolve on each run with the bot's token. The listener's memory (static data) can lose a write when two executions overlap; the worst case is a duplicate dispatch, which `concurrency` serialises.
 
 **If no job starts** ("account is locked due to a billing issue"): GitHub had created $0 budgets with usage blocked on an account with no payment method, and they block even free public-repository minutes. They can be edited or deleted only after adding a payment method; with the card added and the budgets left blocked, the jobs ran and nothing paid can run.
