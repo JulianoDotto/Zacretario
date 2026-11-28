@@ -179,6 +179,20 @@ A second n8n, `n8n-teste`, runs on the same server for the Kanban agent ([docs/s
 
 The WhatsApp entry webhook is closed in Caddy for `teste.<domain>` too, so a fake message from the internet cannot spend test API credits.
 
+## Trello (Kanban board)
+
+The board and the agent are described in [kanban.md](kanban.md).
+
+1. **Board.** A private board `Zacretário` with the lists `Backlog`, `Em andamento`, `Para teste`, `Pronto` (in this order) and the labels `Bloqueado` and `Na fila`.
+2. **API key and token.** At [trello.com/power-ups/admin](https://trello.com/power-ups/admin), create an app that **doesn't use Power-up capabilities** (otherwise an iframe URL is required). Under **Authorization → Trello Auth**, generate the API key, then the token. Keep both in a password manager: together they act as your Trello user, on all your boards. OAuth 2.0 on that page is not used.
+3. **Claude Code.** Add the MCP server with the values typed in the command itself (on Windows `npx` runs through `cmd /c`):
+
+   ```powershell
+   claude mcp add trello --scope user -e TRELLO_API_KEY=<key> -e TRELLO_TOKEN=<token> -- cmd /c npx -y atlassian-trello-mcp@1.7.2
+   ```
+
+   The version is pinned on purpose: a new version of third-party code holding the token only comes in when you decide. Version `1.7.2` only talks to `api.trello.com` and Trello attachments, and its telemetry stays off unless `APPLICATIONINSIGHTS_CONNECTION_STRING` is set. Trello's official MCP (`https://mcp.trello.com/v1`) only accepts interactive OAuth, so it cannot run on GitHub Actions.
+
 ## Updating
 
 Images are pinned. To update one, change its tag in `infra/docker-compose.yml`, copy the file to the server, and run `docker compose pull <service> && docker compose up -d <service>`. Read the release notes first, especially for Evolution API.
