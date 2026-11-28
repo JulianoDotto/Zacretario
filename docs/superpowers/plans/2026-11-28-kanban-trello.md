@@ -96,7 +96,7 @@
 - [x] **Passo 1:** escolher o servidor MCP do Trello (mantido, com as operações acima, que rode por `npx` no Claude Code e no Actions). Mostre ao usuário a escolha e o motivo.
 - [x] **Passo 2:** o usuário cria o quadro **privado** "Zacretário" com as listas e etiquetas exatas, e gera a API key e o token do Trello. Os valores ficam no gerenciador de senhas, nunca no chat.
 - [x] **Passo 3:** o usuário cadastra o MCP no Claude Code (`claude mcp add … --scope user`), digitando os valores no próprio comando ou como variável de ambiente.
-- [ ] **Passo 4: Conferir** numa sessão nova: o MCP lista as quatro listas do quadro pelo nome. Anote os IDs do quadro e da lista `Para teste`.
+- [x] **Passo 4: Conferir** numa sessão nova: o MCP lista as quatro listas do quadro pelo nome. Anote os IDs do quadro e da lista `Para teste`. *(Conferido: o quadro tinha `Em Progresso`, `Para Teste` e `Na Fila`, que foram renomeados pelo MCP, e estava visível para o Workspace, depois passou a `Private`. `TRELLO_BOARD_ID` = `6b0a782beaaeead82278acab`, `TRELLO_LIST_PARA_TESTE_ID` = `6b0a782beaaeead82278accc`.)*
 - [x] **Passo 5:** escrever o `docs/kanban.md` e a seção do `setup.md`, e fazer commit: `docs: Kanban board and Trello MCP setup`.
 
 ### Task 4: Skill `novo-card`
