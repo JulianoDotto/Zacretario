@@ -1,0 +1,596 @@
+{
+  "id": "zEaladEUZjz5cOLY",
+  "name": "Testes do agente",
+  "description": "Roda o Agente Zacretário sempre como a pessoa 'teste' (agenda e dados isolados). Fica sem publicar: só é executado manualmente, pelo editor ou pelo MCP.",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "1987b10c-7803-4b74-b5c9-b39d281f8ea4",
+      "name": "Mensagem de teste",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "testes-agente",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "59d03874-d888-4ba7-ba31-5b260428eaba"
+    },
+    {
+      "id": "17e8437d-ed9c-4d9f-a87a-0c7d4a25982d",
+      "name": "Chamar Agente como teste",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "DzbEHTWa8Hcez5V6",
+          "cachedResultName": "Agente Zacretário (teste)",
+          "cachedResultUrl": "/workflow/DzbEHTWa8Hcez5V6"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "user_key": "teste",
+            "name": "Teste",
+            "timezone": "America/Sao_Paulo",
+            "text": "={{ $json.body.text }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "user_key",
+              "displayName": "user_key",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "timezone",
+              "displayName": "timezone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "text",
+              "displayName": "text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "4cedd73a-c494-4e25-a920-e2d692edce66",
+      "name": "Resposta",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {}
+      }
+    },
+    {
+      "id": "e641daf1-7502-4aaa-ab9d-635a21f70996",
+      "name": "Resetar teste",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        240
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "testes-agente-reset",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "0213af53-3522-4aac-b6ca-c4367b377522"
+    },
+    {
+      "id": "58422075-40d5-4fd4-8af4-f5143346ad3e",
+      "name": "Limpar dados do teste",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        224,
+        240
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "DELETE FROM conversation WHERE user_key = 'teste';\nDELETE FROM todos WHERE user_key = 'teste';\nUPDATE preferences SET day_start = '08:00', day_end = '22:00', blocked_weekdays = '{}' WHERE user_key = 'teste';\nSELECT (SELECT count(*) FROM conversation WHERE user_key = 'teste') AS conversa, (SELECT count(*) FROM todos WHERE user_key = 'teste') AS todos;",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "5m9yHkKV7JeOd48c",
+          "name": "Postgres Zacretário"
+        }
+      }
+    },
+    {
+      "id": "3944b79d-07cb-4fd2-af2b-fdd384c08e1f",
+      "name": "Resposta do reset",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        448,
+        240
+      ],
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {}
+      }
+    },
+    {
+      "id": "92c53dd4-45a6-4777-b834-625f2b84361c",
+      "name": "Medir",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        448,
+        -160
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "5TeW0I5NmdivlJdx",
+          "cachedResultName": "Medir execução do agente",
+          "cachedResultUrl": "/workflow/5TeW0I5NmdivlJdx"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "exec_id": "={{ $json.exec_id }}",
+            "output": "={{ $json.output }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "exec_id",
+              "displayName": "exec_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "output",
+              "displayName": "output",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "7f794479-9bfb-431d-9903-e54cf72e608f",
+      "name": "Manual? (mensagem)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        112,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "m1",
+              "leftValue": "={{ $execution.mode }}",
+              "rightValue": "test",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "19ec5b3b-edc6-40e6-91b2-524102b4027f",
+      "name": "Manual? (reset)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        112,
+        240
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "m2",
+              "leftValue": "={{ $execution.mode }}",
+              "rightValue": "test",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "d35cbe71-91e3-47c5-8a10-64fa6bf91e26",
+      "name": "Recusar",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        224,
+        400
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "Só roda em execução manual.",
+        "options": {
+          "responseCode": 403
+        }
+      }
+    },
+    {
+      "id": "47e8e9e3-04fa-4a4e-8d9d-8caa9f40ecb9",
+      "name": "Mídia de teste",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        600
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "testes-agente-midia",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "01c43128-a408-42d7-a7d6-c626798f73f3"
+    },
+    {
+      "id": "c3089897-d077-4e58-9207-c9ee3f908495",
+      "name": "Manual? (mídia)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        224,
+        600
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "m3",
+              "leftValue": "={{ $execution.mode }}",
+              "rightValue": "test",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "30ec0699-6413-4998-a258-811edbd3d0cf",
+      "name": "Chamar Ler mídia",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        448,
+        600
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "xjs8GAoLEhaNKj5Q",
+          "cachedResultName": "Ler mídia",
+          "cachedResultUrl": "/workflow/xjs8GAoLEhaNKj5Q"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "webMessage": "={{ $json.body.webMessage }}",
+            "mediaKind": "={{ $json.body.mediaKind }}",
+            "mimetype": "={{ $json.body.mimetype }}",
+            "caption": "={{ $json.body.caption ?? null }}",
+            "isForwarded": "={{ $json.body.isForwarded === true }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "webMessage",
+              "displayName": "webMessage",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object",
+              "removed": false
+            },
+            {
+              "id": "mediaKind",
+              "displayName": "mediaKind",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "mimetype",
+              "displayName": "mimetype",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "caption",
+              "displayName": "caption",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "isForwarded",
+              "displayName": "isForwarded",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "boolean",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "each",
+        "options": {}
+      }
+    },
+    {
+      "id": "faec921f-8df1-4e68-ae0b-9c7197628f60",
+      "name": "Resposta da mídia",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        672,
+        600
+      ],
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Limpar dados do teste": {
+      "main": [
+        [
+          {
+            "node": "Resposta do reset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chamar Agente como teste": {
+      "main": [
+        [
+          {
+            "node": "Medir",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Medir": {
+      "main": [
+        [
+          {
+            "node": "Resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mensagem de teste": {
+      "main": [
+        [
+          {
+            "node": "Manual? (mensagem)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual? (mensagem)": {
+      "main": [
+        [
+          {
+            "node": "Chamar Agente como teste",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Recusar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resetar teste": {
+      "main": [
+        [
+          {
+            "node": "Manual? (reset)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual? (reset)": {
+      "main": [
+        [
+          {
+            "node": "Limpar dados do teste",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Recusar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mídia de teste": {
+      "main": [
+        [
+          {
+            "node": "Manual? (mídia)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual? (mídia)": {
+      "main": [
+        [
+          {
+            "node": "Chamar Ler mídia",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Recusar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chamar Ler mídia": {
+      "main": [
+        [
+          {
+            "node": "Resposta da mídia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "nodeGroups": [],
+  "tags": []
+}

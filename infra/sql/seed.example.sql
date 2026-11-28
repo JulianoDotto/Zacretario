@@ -10,3 +10,14 @@ ON CONFLICT (key) DO NOTHING;
 
 INSERT INTO preferences (user_key) VALUES ('ana'), ('bruno')
 ON CONFLICT (user_key) DO NOTHING;
+
+-- Test person for agent evaluations (workflows/fixtures/testes-agente.md).
+-- No WhatsApp: the fake whatsapp_id never matches a real sender. calendar_id is a
+-- separate Google calendar ("Zacretário teste") in the owner's account; in
+-- "Google Agenda (por pessoa)" the rule `teste` reuses the owner's credential.
+INSERT INTO users (key, whatsapp_id, name, calendar_id) VALUES
+    ('teste', 'teste-sem-whatsapp', 'Teste', '<id>@group.calendar.google.com')
+ON CONFLICT (key) DO NOTHING;
+
+INSERT INTO preferences (user_key) VALUES ('teste')
+ON CONFLICT (user_key) DO NOTHING;

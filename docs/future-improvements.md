@@ -20,11 +20,11 @@ Part: a new workflow with a **Schedule Trigger**.
 
 With Evolution API there is no 24-hour window and no template approval, so a scheduled workflow can read upcoming events (through *Portão de agenda*) or a `reminders` table and send through the same Evolution request as `Enviar resposta`. A `create_reminder` tool would let the agent schedule them.
 
-## Audio, images and forwarded messages
+## More kinds of media
 
-Part: `Normalizar mensagem` and the `É texto?` branch.
+Part: **Ler mídia** and `readableMedia` in `Normalizar mensagem`.
 
-Evolution API delivers media in the same `MESSAGES_UPSERT` event. Audio would get its own branch: download the media from Evolution, transcribe it, and feed the text into `Contexto` like a typed message. Images and forwards follow the same pattern.
+Audio, images and PDFs are read today. Video, stickers, Word or spreadsheet files and locations still get the "text only" notice. Each new kind is one more case in `readableMedia` and one more branch in **Ler mídia** that ends in text.
 
 ## Shared household items (e.g. a shared shopping list)
 
@@ -41,7 +41,7 @@ Part: a new entry workflow.
 ## Housekeeping and concurrency
 
 - **Pruning old rows.** `processed_messages` and `conversation` only grow. A daily Schedule Trigger with one SQL statement could delete deduplication rows older than a few days and conversation rows older than 24 hours.
-- **Per-person ordering.** Two messages sent close together run as separate executions and can interleave (a "yes" racing the message it confirms). n8n's queue mode or a per-user lock row would serialise them.
+- **Per-person ordering.** Two messages sent close together run as separate executions and can interleave (a "yes" racing the message it confirms). n8n's queue mode or a per-user lock row would serialise them. The same applies to an album of photos: each one is its own execution and its own question; grouping media that arrive together would give one answer.
 - **Timed event back to all-day.** `update_event` can turn an all-day event into a timed one, but not the reverse; it needs an `all_day` input on the tool and a branch in the `Decidir` Code node.
 
 ## Observability
