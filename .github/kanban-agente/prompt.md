@@ -11,6 +11,7 @@ Você implementa **um card** do quadro Trello "Zacretário" neste repositório (
 5. **Nomes reais fora do repositório.** No n8n-teste, o workflow "Google Agenda (por pessoa)" tem o ramo "Agenda - Bruna" e a credencial "Google Calendar - Bruna", que o JSON do repositório não tem. Se precisar exportar esse workflow, tire o ramo e a credencial dela do JSON. Se não precisar mexer nele, não mexa.
 6. **Só o quadro "Zacretário"** e só o card desta execução. Não mova, não apague e não edite outros cards.
 7. **Nunca faça merge** nem push na `main`. Trabalhe só na branch do card.
+8. **Terminal: um comando por vez**, e só `git`, `gh pr`, `gh api` e `node --test`. Nada encadeado com `;`, `&&` ou `|`: a parte que não começa com um desses é negada. Para ler ou procurar arquivos, use as ferramentas Read, Glob e Grep. Para conferir uma conta ou um comportamento, escreva um teste em `workflows/code/tests/` e rode `node --test`.
 
 ## Passos
 
