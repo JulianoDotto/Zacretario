@@ -35,13 +35,13 @@
 
 ### Task 0: Fechar a `feat/n8n` na `main`
 
-**Arquivos:** nenhum novo. É um PR da `feat/n8n` para a `main` e uma regra de proteção da `main`.
+**Arquivos:** nenhum novo. *(Na execução: a `main` já tinha a migração pelo PR #1; o PR #2 levou os 27 commits restantes. Ruleset "Main Protegida" ativo.)* É um PR da `feat/n8n` para a `main` e uma regra de proteção da `main`.
 
-- [ ] **Passo 1:** conferir que a `feat/n8n` está limpa (`git status`) e que `node --test workflows/code/tests/` passa.
-- [ ] **Passo 2:** push da `feat/n8n` e abertura do PR para a `main`. O título resume a migração para n8n. É ação pública, então só com o "sim" do usuário.
-- [ ] **Passo 3:** o usuário revisa e faz o merge (merge commit, para manter o histórico).
-- [ ] **Passo 4:** criar um *ruleset* na `main`: exige PR e bloqueia force push e exclusão. Isso impede o agente de mandar direto para a `main`.
-- [ ] **Passo 5: Conferir.** Pela API do GitHub, a `main` contém `workflows/` e `infra/`, e o ruleset aparece ativo.
+- [x] **Passo 1:** conferir que a `feat/n8n` está limpa (`git status`) e que `node --test workflows/code/tests/` passa.
+- [x] **Passo 2:** push da `feat/n8n` e abertura do PR para a `main`. O título resume a migração para n8n. É ação pública, então só com o "sim" do usuário.
+- [x] **Passo 3:** o usuário revisa e faz o merge (merge commit, para manter o histórico).
+- [x] **Passo 4:** criar um *ruleset* na `main`: exige PR e bloqueia force push e exclusão. Isso impede o agente de mandar direto para a `main`.
+- [x] **Passo 5: Conferir.** Pela API do GitHub, a `main` contém `workflows/` e `infra/`, e o ruleset aparece ativo.
 
 ### Task 1: Subir o n8n-teste
 
