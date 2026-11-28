@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "trello": {
+      "command": "npx",
+      "args": ["-y", "atlassian-trello-mcp@1.7.2"],
+      "env": {
+        "TRELLO_API_KEY": "${TRELLO_API_KEY}",
+        "TRELLO_TOKEN": "${TRELLO_TOKEN}"
+      }
+    },
+    "n8n-teste": {
+      "type": "http",
+      "url": "${N8N_TESTE_MCP_URL}",
+      "headers": { "Authorization": "Bearer ${N8N_TESTE_MCP_TOKEN}" }
+    }
+  }
+}

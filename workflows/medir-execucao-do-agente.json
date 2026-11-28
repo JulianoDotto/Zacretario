@@ -6,105 +6,48 @@
   "isArchived": false,
   "nodes": [
     {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "exec_id"
+            },
+            {
+              "name": "output"
+            }
+          ]
+        }
+      },
       "id": "88d1ea1c-33d3-46db-85fd-5560b93df1cd",
       "name": "Execução a medir",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
       "position": [
         0,
-        0
-      ],
-      "parameters": {
-        "inputSource": "workflowInputs",
-        "workflowInputs": {
-          "values": [
-            {
-              "name": "exec_id",
-              "type": "string"
-            },
-            {
-              "name": "output",
-              "type": "string"
-            }
-          ]
-        }
-      }
+        -64
+      ]
     },
     {
-      "id": "51a63c56-cb72-48a7-862e-327008a487aa",
-      "name": "Buscar execução do Agente",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        224,
-        0
-      ],
       "parameters": {
-        "method": "GET",
-        "url": "=https://dotton8n.com.br/api/v1/executions/{{ $('Execução a medir').first().json.exec_id }}?includeData=true",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "n8nApi",
-        "options": {}
+        "jsCode": "// Resume a execução do Agente: chamadas ao modelo, tokens e ferramentas, em ordem.\nconst exec = $input.first().json;\nconst runData = exec.data?.resultData?.runData ?? {};\nlet chamadas = 0, entrada = 0, saida = 0;\nconst modelos = {}, extras = {}, passos = [];\nfor (const [nome, runs] of Object.entries(runData)) {\n  for (const r of runs) {\n    const lm = r.data?.ai_languageModel?.[0]?.[0]?.json;\n    if (lm?.tokenUsage) {\n      chamadas++;\n      entrada += lm.tokenUsage.promptTokens || 0;\n      saida += lm.tokenUsage.completionTokens || 0;\n      modelos[nome] = (modelos[nome] || 0) + 1;\n      for (const [k, v] of Object.entries(lm.tokenUsage)) {\n        if (!['promptTokens', 'completionTokens', 'totalTokens'].includes(k) && typeof v === 'number') extras[k] = (extras[k] || 0) + v;\n      }\n      for (const [k, v] of Object.entries(r.metadata?.tracing ?? {})) {\n        if (k.includes('cache') && typeof v === 'number') extras[k] = (extras[k] || 0) + v;\n      }\n    }\n    if (r.data?.ai_tool) passos.push({ nome, inicio: r.startTime });\n  }\n}\npassos.sort((a, b) => a.inicio - b.inicio);\nreturn [{ json: {\n  output: $('Execução a medir').first().json.output,\n  exec_id: exec.id,\n  status: exec.status,\n  chamadas, modelos,\n  ferramentas: passos.map(p => p.nome),\n  entrada, saida, extras,\n} }];"
       },
-      "credentials": {
-        "n8nApi": {
-          "id": "u1m0BwQfp10qXsn2",
-          "name": "n8n API"
-        }
-      }
-    },
-    {
       "id": "896ad401-40a1-4171-8d2b-320cf8fc346a",
       "name": "Resumir tokens",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        448,
-        0
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "// Resume a execução do Agente: chamadas ao modelo, tokens e ferramentas, em ordem.\nconst exec = $input.first().json;\nconst runData = exec.data?.resultData?.runData ?? {};\nlet chamadas = 0, entrada = 0, saida = 0;\nconst modelos = {}, extras = {}, passos = [];\nfor (const [nome, runs] of Object.entries(runData)) {\n  for (const r of runs) {\n    const lm = r.data?.ai_languageModel?.[0]?.[0]?.json;\n    if (lm?.tokenUsage) {\n      chamadas++;\n      entrada += lm.tokenUsage.promptTokens || 0;\n      saida += lm.tokenUsage.completionTokens || 0;\n      modelos[nome] = (modelos[nome] || 0) + 1;\n      for (const [k, v] of Object.entries(lm.tokenUsage)) {\n        if (!['promptTokens', 'completionTokens', 'totalTokens'].includes(k) && typeof v === 'number') extras[k] = (extras[k] || 0) + v;\n      }\n      for (const [k, v] of Object.entries(r.metadata?.tracing ?? {})) {\n        if (k.includes('cache') && typeof v === 'number') extras[k] = (extras[k] || 0) + v;\n      }\n    }\n    if (r.data?.ai_tool) passos.push({ nome, inicio: r.startTime });\n  }\n}\npassos.sort((a, b) => a.inicio - b.inicio);\nreturn [{ json: {\n  output: $('Execução a medir').first().json.output,\n  exec_id: exec.id,\n  status: exec.status,\n  chamadas, modelos,\n  ferramentas: passos.map(p => p.nome),\n  entrada, saida, extras,\n} }];"
-      }
+        672,
+        -160
+      ]
     },
     {
-      "id": "21667cea-2c1f-4b6c-a75a-f950262ffa48",
-      "name": "Conferir execução",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        224,
-        -160
-      ],
-      "parameters": {
-        "method": "GET",
-        "url": "=https://dotton8n.com.br/api/v1/executions/{{ $json.exec_id }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "n8nApi",
-        "options": {}
-      },
-      "credentials": {
-        "n8nApi": {
-          "id": "u1m0BwQfp10qXsn2",
-          "name": "n8n API"
-        }
-      }
-    },
-    {
-      "id": "4edde126-0b87-4a27-a388-f539bc350f17",
-      "name": "É da cópia de teste?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [
-        448,
-        -160
-      ],
       "parameters": {
         "conditions": {
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "strict"
+            "typeValidation": "strict",
+            "version": 1
           },
           "conditions": [
             {
@@ -120,19 +63,18 @@
           "combinator": "and"
         },
         "options": {}
-      }
+      },
+      "id": "d0d500a6-ac0e-4780-8b21-453659c5a313",
+      "name": "É da cópia de teste?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        448,
+        -64
+      ]
     },
     {
-      "id": "dfc22b73-d0c2-4de0-a735-cdcdff4558d2",
-      "name": "Recusada",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        672,
-        40
-      ],
       "parameters": {
-        "mode": "manual",
         "assignments": {
           "assignments": [
             {
@@ -144,6 +86,39 @@
           ]
         },
         "options": {}
+      },
+      "id": "35160954-d07f-4573-b4b0-45b45d6ef19d",
+      "name": "Recusada",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        672,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "execution",
+        "operation": "get",
+        "executionId": "={{ $('Execução a medir').first().json.exec_id }}",
+        "options": {
+          "activeWorkflows": true
+        },
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.n8n",
+      "typeVersion": 1,
+      "position": [
+        224,
+        -64
+      ],
+      "id": "4d6a956d-7611-4ead-bb05-e8477405a38c",
+      "name": "Conferir execução",
+      "credentials": {
+        "n8nApi": {
+          "id": "u1m0BwQfp10qXsn2",
+          "name": "n8n API"
+        }
       }
     }
   ],
@@ -159,11 +134,18 @@
         ]
       ]
     },
-    "Buscar execução do Agente": {
+    "É da cópia de teste?": {
       "main": [
         [
           {
             "node": "Resumir tokens",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Recusada",
             "type": "main",
             "index": 0
           }
@@ -180,30 +162,13 @@
           }
         ]
       ]
-    },
-    "É da cópia de teste?": {
-      "main": [
-        [
-          {
-            "node": "Buscar execução do Agente",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Recusada",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
     }
   },
   "settings": {
     "executionOrder": "v1",
     "availableInMCP": true,
-    "saveDataSuccessExecution": "none"
+    "saveDataSuccessExecution": "none",
+    "binaryMode": "separate"
   },
   "nodeGroups": [],
   "tags": []

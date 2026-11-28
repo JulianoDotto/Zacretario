@@ -15,6 +15,8 @@ services:
       N8N_DB_PASSWORD: ${N8N_DB_PASSWORD}
       EVOLUTION_DB_PASSWORD: ${EVOLUTION_DB_PASSWORD}
       ZACRETARIO_DB_PASSWORD: ${ZACRETARIO_DB_PASSWORD}
+      N8N_TESTE_DB_PASSWORD: ${N8N_TESTE_DB_PASSWORD}
+      ZACRETARIO_TESTE_DB_PASSWORD: ${ZACRETARIO_TESTE_DB_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
@@ -50,6 +52,35 @@ services:
     volumes:
       - n8n_data:/home/node/.n8n
     # No published port: Caddy reaches n8n at n8n:5678.
+
+  # Test copy of n8n for the Kanban agent (docs/kanban.md). Same image as n8n,
+  # but its own databases, encryption key and credentials: nothing here can
+  # reach production data. No Evolution API: workflows run by hand or by tests.
+  n8n-teste:
+    image: n8nio/n8n:2.49.6
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_DATABASE: n8n_teste
+      DB_POSTGRESDB_USER: n8n_teste
+      DB_POSTGRESDB_PASSWORD: ${N8N_TESTE_DB_PASSWORD}
+      N8N_ENCRYPTION_KEY: ${N8N_TESTE_ENCRYPTION_KEY}
+      N8N_HOST: teste.${DOMAIN}
+      N8N_PROTOCOL: https
+      N8N_PROXY_HOPS: 1
+      WEBHOOK_URL: https://teste.${DOMAIN}/
+      GENERIC_TIMEZONE: America/Sao_Paulo
+      TZ: America/Sao_Paulo
+      EXECUTIONS_DATA_PRUNE: "true"
+      EXECUTIONS_DATA_MAX_AGE: 336 # hours (14 days)
+      N8N_DIAGNOSTICS_ENABLED: "false"
+    volumes:
+      - n8n_teste_data:/home/node/.n8n
+    # No published port: Caddy reaches it at n8n-teste:5678.
 
   evolution:
     image: evoapicloud/evolution-api:v2.3.8
@@ -87,6 +118,7 @@ services:
     restart: unless-stopped
     depends_on:
       - n8n
+      - n8n-teste
     environment:
       DOMAIN: ${DOMAIN}
     ports:
@@ -100,6 +132,7 @@ services:
 volumes:
   pgdata:
   n8n_data:
+  n8n_teste_data:
   evolution_instances:
   caddy_data:
   caddy_config:

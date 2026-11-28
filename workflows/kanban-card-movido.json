@@ -1,0 +1,574 @@
+{
+  "id": "gcskfYPYva5cCmgn",
+  "name": "Kanban: card movido",
+  "description": "Escuta o quadro Zacretário no Trello, aplica a regra \"um card por vez\" e dispara o agente do Kanban no GitHub (repository_dispatch card-em-andamento).",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "id": "6b0a782beaaeead82278acab"
+      },
+      "id": "ff23c9ee-84a3-406d-adbc-ada7c1c241c0",
+      "name": "Trello: algo mudou",
+      "type": "n8n-nodes-base.trelloTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        192
+      ],
+      "credentials": {
+        "trelloApi": {
+          "id": "JV1d3U3PxbDAJ744",
+          "name": "Trello account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.action?.type }}",
+              "rightValue": "updateCard",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "leftValue": "={{ $json.action?.data?.listAfter?.name ?? \"\" }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ]
+        }
+      },
+      "id": "037b1a77-5c92-4b69-ab74-faf90de2a88e",
+      "name": "Só mudança de lista",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.4,
+      "position": [
+        224,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.trello.com/1/boards/6b0a782beaaeead82278acab",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "trelloApi",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fields",
+              "value": "id"
+            },
+            {
+              "name": "cards",
+              "value": "open"
+            },
+            {
+              "name": "card_fields",
+              "value": "idList,pos,labels"
+            },
+            {
+              "name": "lists",
+              "value": "open"
+            },
+            {
+              "name": "list_fields",
+              "value": "name"
+            }
+          ]
+        }
+      },
+      "id": "3402d6d8-6645-4b05-91aa-70635aace864",
+      "name": "Buscar quadro",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        192
+      ],
+      "credentials": {
+        "trelloApi": {
+          "id": "JV1d3U3PxbDAJ744",
+          "name": "Trello account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Builds the input of \"Decidir\" from the Trello webhook and the board state.\n// Reads the static data (seenActionIds, dispatched) without writing it; \"Registrar\" writes.\nconst SLOT_LISTS = ['Em andamento', 'Para teste'];\n\nconst action = $('Trello: algo mudou').item.json.action;\nconst board = $json;\n\nconst listName = {};\nfor (const list of board.lists || []) listName[list.id] = list.name;\n\nconst cards = (board.cards || []).map((c) => ({\n  id: c.id,\n  list: listName[c.idList] || c.idList,\n  pos: c.pos,\n  labels: (c.labels || []).map((l) => l.name),\n}));\n\nconst data = $getWorkflowStaticData('global');\nconst inSlot = new Set(cards.filter((c) => SLOT_LISTS.includes(c.list)).map((c) => c.id));\n// A dispatched card that left \"Em andamento\"/\"Para teste\" no longer holds the slot.\nconst dispatched = (data.dispatched || []).filter((id) => inSlot.has(id));\n\nconst d = action.data || {};\nreturn {\n  json: {\n    action: {\n      id: action.id,\n      type: action.type,\n      cardId: d.card?.id ?? null,\n      listBefore: d.listBefore?.name ?? null,\n      listAfter: d.listAfter?.name ?? null,\n    },\n    cards,\n    seenActionIds: data.seenActionIds || [],\n    dispatched,\n  },\n};\n"
+      },
+      "id": "cdbca29a-b269-4748-82e5-5cc73f342829",
+      "name": "Montar entrada",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// n8n Code node \"Decidir\" (Kanban: card movido) — mode: Run Once for Each Item.\n// Applies the \"one card at a time\" rule: there is one n8n-teste, so one card\n// holds the slot from \"Em andamento\" until it leaves \"Para teste\".\n// Input $json:\n//   action: { id, type, cardId, listBefore, listAfter }  (list names; null when the list did not change)\n//   cards: [{ id, list, pos, labels }]                   (open cards, state after the action)\n//   seenActionIds: string[]                              (Trello may deliver a webhook twice)\n//   dispatched: string[]                                 (cards already sent to the agent, still in the slot)\n// Output: { dispatch, queue, unqueue, reason } — card ids or null.\n\nconst EM_ANDAMENTO = 'Em andamento';\nconst PARA_TESTE = 'Para teste';\nconst NA_FILA = 'Na fila';\nconst SLOT_LISTS = [EM_ANDAMENTO, PARA_TESTE];\n\nconst { action, cards = [], seenActionIds = [], dispatched = [] } = $json;\nconst out = (dispatch, queue, unqueue, reason) => ({ json: { dispatch, queue, unqueue, reason } });\n\nif (seenActionIds.includes(action.id)) return out(null, null, null, 'duplicate');\n\nconst { cardId, listBefore, listAfter } = action;\nif (action.type !== 'updateCard' || !listBefore || !listAfter) {\n  return out(null, null, null, 'Não é uma mudança de lista.');\n}\nif (listBefore === listAfter) return out(null, null, null, 'Mudou só a posição na lista.');\n\nconst inSlot = (list) => SLOT_LISTS.includes(list);\nconst queued = (c) => c.labels.includes(NA_FILA);\nconst byPos = (a, b) => a.pos - b.pos;\nconst actionCard = cards.find((c) => c.id === cardId);\n\n// The slot is taken by someone else: a card in \"Para teste\", or a dispatched\n// card still in \"Em andamento\" (running or \"Bloqueado\").\nconst others = cards.filter((c) => c.id !== cardId);\nconst slotTaken = others.some(\n  (c) => c.list === PARA_TESTE || (c.list === EM_ANDAMENTO && dispatched.includes(c.id)),\n);\n\n// Entering \"Em andamento\" from anywhere else (Backlog, or back from \"Para teste\").\nif (listAfter === EM_ANDAMENTO) {\n  if (slotTaken) {\n    return out(\n      null,\n      cardId,\n      null,\n      'Na fila: outro card está usando o n8n-teste. Este começa sozinho quando a vaga liberar.',\n    );\n  }\n  // Two cards dragged together: both executions see the same board and the\n  // highest one (lowest pos) wins in both, so only one is dispatched.\n  const first = cards\n    .filter((c) => c.list === EM_ANDAMENTO && (c.id === cardId || !queued(c)))\n    .sort(byPos)[0];\n  if (first && first.id !== cardId) {\n    return out(null, cardId, null, 'Na fila: outro card entrou junto e está mais alto na lista.');\n  }\n  return out(cardId, null, null, 'Vaga livre.');\n}\n\n// Leaving the slot (to Backlog, Pronto or any list outside it).\nif (inSlot(listBefore) && !inSlot(listAfter)) {\n  if (actionCard && queued(actionCard)) {\n    return out(null, null, cardId, 'Saiu da fila sem ter começado.');\n  }\n  if (slotTaken) return out(null, null, null, 'Outro card ainda está com a vaga.');\n  const next = cards.filter((c) => c.list === EM_ANDAMENTO && queued(c)).sort(byPos)[0];\n  if (!next) return out(null, null, null, 'Vaga livre e fila vazia.');\n  return out(next.id, null, next.id, 'Vaga liberada: começa o próximo da fila.');\n}\n\n// \"Em andamento\" → \"Para teste\" keeps the slot; moves outside the slot do not touch it.\nreturn out(null, null, null, 'Não mexe na vaga.');\n"
+      },
+      "id": "5b436a47-bb3b-43ec-be2c-4e86030fa9be",
+      "name": "Decidir",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        944,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Saves what \"Decidir\" decided in the workflow's static data (kept only by\n// production executions): the last 50 action ids, and the dispatched cards.\nconst data = $getWorkflowStaticData('global');\nconst input = $('Montar entrada').item.json;\nconst decision = $json;\n\nif (decision.reason !== 'duplicate') {\n  data.seenActionIds = [...input.seenActionIds, input.action.id].slice(-50);\n}\nconst dispatched = [...input.dispatched];\nif (decision.dispatch && !dispatched.includes(decision.dispatch)) dispatched.push(decision.dispatch);\ndata.dispatched = dispatched;\n\nreturn { json: { ...decision, cardId: input.action.cardId } };\n"
+      },
+      "id": "e10d4b41-9709-4a08-8891-a6311fb647c2",
+      "name": "Registrar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1168,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.dispatch ?? \"\" }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ]
+        }
+      },
+      "id": "b0d189ec-847a-46db-aaf3-766d86f37593",
+      "name": "Tem disparo?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.4,
+      "position": [
+        1200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.github.com/repos/JulianoDotto/Zacretario/dispatches",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ event_type: \"card-em-andamento\", client_payload: { card_id: $json.dispatch } }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "6b493dcf-73ce-426f-a315-2574cc1645ad",
+      "name": "Disparar agente",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1424,
+        0
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "pIgKBBCkBgbDtP1Q",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.queue ?? \"\" }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ]
+        }
+      },
+      "id": "81eb4a8d-485d-42b6-bb4e-74e986101ab1",
+      "name": "Vai para a fila?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.4,
+      "position": [
+        1200,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "label",
+        "operation": "addLabel",
+        "cardId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.queue }}"
+        },
+        "id": "6b0a7904c1f45cb39fefa087"
+      },
+      "id": "675675d5-fa1f-49cf-ab81-da29dd9f295b",
+      "name": "Pôr Na fila",
+      "type": "n8n-nodes-base.trello",
+      "typeVersion": 1,
+      "position": [
+        1424,
+        192
+      ],
+      "credentials": {
+        "trelloApi": {
+          "id": "JV1d3U3PxbDAJ744",
+          "name": "Trello account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "cardComment",
+        "operation": "create",
+        "cardId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $(\"Registrar\").item.json.queue }}"
+        },
+        "text": "={{ $(\"Registrar\").item.json.reason }}"
+      },
+      "id": "c2144a99-23b5-4a53-b97b-cb071fe7c4bd",
+      "name": "Comentar o motivo",
+      "type": "n8n-nodes-base.trello",
+      "typeVersion": 1,
+      "position": [
+        1648,
+        192
+      ],
+      "credentials": {
+        "trelloApi": {
+          "id": "JV1d3U3PxbDAJ744",
+          "name": "Trello account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.unqueue ?? \"\" }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ]
+        }
+      },
+      "id": "5744aaa0-9462-4f5a-b394-e7d38a9fc128",
+      "name": "Sai da fila?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.4,
+      "position": [
+        1200,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "label",
+        "operation": "removeLabel",
+        "cardId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.unqueue }}"
+        },
+        "id": "6b0a7904c1f45cb39fefa087"
+      },
+      "id": "814c6516-52bc-4521-9c10-b9256b0511ef",
+      "name": "Tirar Na fila",
+      "type": "n8n-nodes-base.trello",
+      "typeVersion": 1,
+      "position": [
+        1424,
+        384
+      ],
+      "credentials": {
+        "trelloApi": {
+          "id": "JV1d3U3PxbDAJ744",
+          "name": "Trello account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Kanban: card movido\nEscuta o quadro Zacretário no Trello. A regra \"um card por vez\" está no Code node **Decidir** (`workflows/code/kanban-decidir.js`, com testes). Os nomes das listas e da etiqueta `Na fila` precisam ser exatamente os do quadro.",
+        "color": 4,
+        "width": 608,
+        "height": 224
+      },
+      "id": "1bdde18c-bfd7-4537-b97d-25524da0567f",
+      "name": "Sticky Note ac83509c",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        96
+      ]
+    }
+  ],
+  "connections": {
+    "Trello: algo mudou": {
+      "main": [
+        [
+          {
+            "node": "Só mudança de lista",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Só mudança de lista": {
+      "main": [
+        [
+          {
+            "node": "Buscar quadro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar quadro": {
+      "main": [
+        [
+          {
+            "node": "Montar entrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar entrada": {
+      "main": [
+        [
+          {
+            "node": "Decidir",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decidir": {
+      "main": [
+        [
+          {
+            "node": "Registrar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar": {
+      "main": [
+        [
+          {
+            "node": "Tem disparo?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Vai para a fila?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Sai da fila?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tem disparo?": {
+      "main": [
+        [
+          {
+            "node": "Disparar agente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vai para a fila?": {
+      "main": [
+        [
+          {
+            "node": "Pôr Na fila",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pôr Na fila": {
+      "main": [
+        [
+          {
+            "node": "Comentar o motivo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sai da fila?": {
+      "main": [
+        [
+          {
+            "node": "Tirar Na fila",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "errorWorkflow": "93khVPDggzbYIxrs",
+    "callerPolicy": "workflowsFromSameOwner",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [
+    {
+      "id": "f52c0cc0-2b1d-4cc6-a967-b588eba6c500",
+      "name": "Decidir",
+      "nodeNames": [
+        "Montar entrada",
+        "Decidir",
+        "Registrar"
+      ],
+      "description": "Monta o estado do quadro, aplica a regra \"um card por vez\" e guarda o que foi disparado."
+    },
+    {
+      "id": "bd533cad-3e29-4da2-bb9c-7d16adf88109",
+      "name": "Ler o quadro",
+      "nodeNames": [
+        "Só mudança de lista",
+        "Buscar quadro"
+      ],
+      "description": "Ignora o que não é mudança de lista e busca os cards abertos (lista, posição e etiquetas)."
+    },
+    {
+      "id": "a25b3982-4a5f-4d16-83d3-48a2ae35fed1",
+      "name": "Disparar",
+      "nodeNames": [
+        "Tem disparo?",
+        "Disparar agente"
+      ],
+      "description": "Chama o repository_dispatch card-em-andamento do GitHub com o id do card."
+    },
+    {
+      "id": "649a439a-2140-443a-adf0-1dd27670f726",
+      "name": "Pôr na fila",
+      "nodeNames": [
+        "Vai para a fila?",
+        "Pôr Na fila",
+        "Comentar o motivo"
+      ],
+      "description": "Põe a etiqueta Na fila e comenta no card por que ele está esperando."
+    },
+    {
+      "id": "9ef8e3d5-b921-482b-aacd-53ce03c561b6",
+      "name": "Tirar da fila",
+      "nodeNames": [
+        "Sai da fila?",
+        "Tirar Na fila"
+      ],
+      "description": "Tira a etiqueta Na fila do card que começou ou que saiu da fila."
+    }
+  ],
+  "tags": []
+}

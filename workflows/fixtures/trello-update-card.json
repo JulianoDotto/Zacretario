@@ -1,0 +1,38 @@
+{
+  "model": {
+    "id": "board-zacretario",
+    "name": "Zacretário",
+    "closed": false,
+    "prefs": { "permissionLevel": "private" }
+  },
+  "action": {
+    "id": "action-1",
+    "idMemberCreator": "member-1",
+    "data": {
+      "old": { "idList": "list-em-andamento" },
+      "card": {
+        "idList": "list-backlog",
+        "id": "card-1",
+        "name": "Apagar conversas e IDs de mensagem antigos todo dia",
+        "idShort": 1,
+        "shortLink": "card1abc"
+      },
+      "board": { "id": "board-zacretario", "name": "Zacretário", "shortLink": "board1ab" },
+      "listBefore": { "id": "list-em-andamento", "name": "Em andamento" },
+      "listAfter": { "id": "list-backlog", "name": "Backlog" }
+    },
+    "appCreator": null,
+    "type": "updateCard",
+    "date": "2026-11-28T07:51:56.426Z",
+    "display": {
+      "translationKey": "action_move_card_from_list_to_list"
+    }
+  },
+  "webhook": {
+    "id": "webhook-1",
+    "description": "n8n Webhook - board-zacretario",
+    "idModel": "board-zacretario",
+    "active": true,
+    "consecutiveFailures": 0
+  }
+}

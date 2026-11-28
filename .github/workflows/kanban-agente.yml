@@ -1,0 +1,73 @@
+name: Kanban agente
+
+on:
+  repository_dispatch:
+    types: [card-em-andamento]
+
+concurrency:
+  group: kanban-agente
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  card:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Validar o card_id
+        env:
+          CARD_ID: ${{ github.event.client_payload.card_id }}
+        run: |
+          if ! [[ "$CARD_ID" =~ ^[0-9a-f]{24}$ ]]; then
+            echo "card_id inválido"; exit 1
+          fi
+
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Montar o prompt
+        id: prompt
+        env:
+          CARD_ID: ${{ github.event.client_payload.card_id }}
+          BOARD_ID: ${{ vars.TRELLO_BOARD_ID }}
+          LIST_PARA_TESTE_ID: ${{ vars.TRELLO_LIST_PARA_TESTE_ID }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          {
+            echo 'text<<PROMPT_EOF'
+            cat .github/kanban-agente/prompt.md
+            echo
+            echo '## Dados desta execução'
+            echo "- card_id: $CARD_ID"
+            echo "- quadro: $BOARD_ID"
+            echo "- lista Para teste: $LIST_PARA_TESTE_ID"
+            echo "- execução: $RUN_URL"
+            echo 'PROMPT_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Agente
+        uses: anthropics/claude-code-action@4411a9e9b0283becf4b924f7bce360fd7756c78c # v1.0.290
+        env:
+          TRELLO_API_KEY: ${{ secrets.TRELLO_API_KEY }}
+          TRELLO_TOKEN: ${{ secrets.TRELLO_TOKEN }}
+          N8N_TESTE_MCP_URL: ${{ vars.N8N_TESTE_MCP_URL }}
+          N8N_TESTE_MCP_TOKEN: ${{ secrets.N8N_TESTE_MCP_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          prompt: ${{ steps.prompt.outputs.text }}
+          claude_args: >-
+            --mcp-config .github/kanban-agente/mcp.json
+            --max-turns 80
+            --permission-mode default
+            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(git:*),Bash(gh pr:*),Bash(gh api:*),Bash(node --test:*),mcp__trello,mcp__n8n-teste"

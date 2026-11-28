@@ -159,6 +159,51 @@ Only people in the `users` table get an answer.
 
 **Test person.** Agent evaluations run as the person `teste`, never as a real user: a fake `whatsapp_id` (`teste-sem-whatsapp`, so the bot never answers it) and its own Google calendar, "Zacretário teste", created in the owner's account. Put that calendar's ID (Google Calendar → Settings → the calendar → *Integrate calendar*) in `calendar_id` (see the end of [seed.example.sql](../infra/sql/seed.example.sql)), and in **Google Agenda (por pessoa)** connect the rule `teste` to the owner's node: same credential, different calendar.
 
+## Test n8n (for the Kanban agent)
+
+A second n8n, `n8n-teste`, runs on the same server for the Kanban agent ([docs/superpowers/specs/2026-11-28-kanban-trello-design.md](superpowers/specs/2026-11-28-kanban-trello-design.md)). It has its own databases (`n8n_teste`, `zacretario_teste`), its own encryption key and its own credentials, and no WhatsApp: nothing in it can reach production data.
+
+1. **DNS.** An `A` record `teste` pointing to the server's IP. Caddy gets the certificate by itself on the first request, so the record must exist first.
+2. **Secrets.** In `/opt/zacretario/infra/.env`, add `N8N_TESTE_DB_PASSWORD`, `ZACRETARIO_TESTE_DB_PASSWORD` and `N8N_TESTE_ENCRYPTION_KEY`, each with a new `openssl rand -hex 32`, never the production values.
+3. **Databases.** `postgres/init.sh` only runs on an empty volume, so on a server that already runs create them by hand, with the same `CREATE ROLE` / `CREATE DATABASE` as the script (load `.env` first with `set -a; . ./.env; set +a`, and pass the password as `psql -v password="$N8N_TESTE_DB_PASSWORD"`). Then apply `sql/001_schema.sql` and `sql/002_conversation.sql` to `zacretario_teste` as the user `zacretario_teste`.
+4. **Start.** `docker compose up -d n8n-teste`, then `docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile` (no downtime).
+   Changing the `environment` of `postgres` (as adding the two passwords does) makes `up` recreate Postgres too: production loses its database connection for about ten seconds. Do it at a quiet hour.
+5. **Owner and MCP.** Open `https://teste.<domain>`, create the owner account (its own password), and turn on **Settings → Instance-level MCP**. To use it from Claude Code: `claude mcp add --transport http --scope user n8n-teste https://teste.<domain>/mcp-server/http`, then authenticate in `/mcp`.
+
+6. **Copy production into it, keeping the IDs.** Workflows call each other by ID and nodes point to credentials by ID, so the test copy must use the same IDs: then a workflow changed and tested here imports back into production with no edits.
+   - **Credentials:** import a JSON list of `{"id", "name", "type", "data": {}}` with the production IDs and names (`docker compose cp` it into `n8n-teste`, then `n8n import:credentials --input=...`), and fill in the test values in the editor: Postgres → `zacretario_teste`, n8n API → Base URL `http://n8n-teste:5678/api/v1` and a key from the test n8n, new Anthropic and Groq keys named `n8n-teste`. **Evolution API keeps a fake key on purpose**: `n8n-teste` is on the same Docker network as Evolution, and the real key would let it send real WhatsApp messages. Credentials of other people (another person's Google) stay empty: they exist only so the workflows can be published.
+   - **Workflows:** `n8n export:workflow --all --separate --output=/tmp/wf/` in `n8n`, `docker compose cp` the folder out and into `n8n-teste`, then `n8n import:workflow --separate --input=/tmp/wf`. They arrive unpublished. Publish the sub-workflows (sub-workflows run their published version); leave **Entrada Whatsapp** and **Testes do agente** unpublished.
+   - **Test person:** copy the `teste` rows with `COPY (SELECT * FROM users WHERE key='teste') TO STDOUT` from `zacretario` piped into `COPY users FROM STDIN` on `zacretario_teste` (and the same for `preferences`).
+   - Delete the temporary files in the server and in both containers afterwards (`docker compose exec -u root ... rm`).
+7. **Promote a change back.** `n8n export:workflow --id=<id>` in `n8n-teste`, copy it into `n8n`, `n8n import:workflow --input=...` (it replaces the workflow with the same ID and unpublishes it), then publish it. The previous version stays in the workflow's history.
+
+The WhatsApp entry webhook is closed in Caddy for `teste.<domain>` too, so a fake message from the internet cannot spend test API credits.
+
+## Trello (Kanban board)
+
+The board and the agent are described in [kanban.md](kanban.md).
+
+1. **Board.** A private board `Zacretário` with the lists `Backlog`, `Em andamento`, `Para teste`, `Pronto` (in this order) and the labels `Bloqueado` and `Na fila`.
+2. **API key and token.** At [trello.com/power-ups/admin](https://trello.com/power-ups/admin), create an app that **doesn't use Power-up capabilities** (otherwise an iframe URL is required). Under **Authorization → Trello Auth**, generate the API key, then the token. Keep both in a password manager: together they act as your Trello user, on all your boards. OAuth 2.0 on that page is not used.
+3. **Claude Code.** Add the MCP server with the values typed in the command itself (on Windows `npx` runs through `cmd /c`):
+
+   ```powershell
+   claude mcp add trello --scope user -e TRELLO_API_KEY=<key> -e TRELLO_TOKEN=<token> -- cmd /c npx -y atlassian-trello-mcp@1.7.2
+   ```
+
+   The version is pinned on purpose: a new version of third-party code holding the token only comes in when you decide. Version `1.7.2` only talks to `api.trello.com` and Trello attachments, and its telemetry stays off unless `APPLICATIONINSIGHTS_CONNECTION_STRING` is set. Trello's official MCP (`https://mcp.trello.com/v1`) only accepts interactive OAuth, so it cannot run on GitHub Actions.
+
+## Trello listener (Kanban: card movido)
+
+The production n8n listens to the board and starts the agent. The workflow is [workflows/kanban-card-movido.json](../workflows/kanban-card-movido.json), in the **Kanban** folder; its Code nodes are `workflows/code/kanban-montar.js`, `kanban-decidir.js` and `kanban-registrar.js`, tested with `node --test workflows/code/tests/`.
+
+1. **Credentials** in production n8n, typed by you:
+   - **Trello API** (`Trello account`): the same API key and token as the Trello MCP.
+   - **GitHub API** (`GitHub account`): a fine-grained token for `JulianoDotto/Zacretario` only, with **Contents: Read and write** and nothing else. That is what `POST /repos/{owner}/{repo}/dispatches` requires. Give it an expiry and a calendar reminder: Contents write could also push to branches other than the protected `main`.
+2. **Import and publish** `workflows/kanban-card-movido.json`. Publishing registers a Trello webhook on the board; unpublishing removes it. The export has no `webhookId`, so n8n makes a new webhook URL on import.
+3. **What it does.** Every board event runs it; anything that is not a card changing lists (comments, labels, including its own) stops at the first Filter. It fetches the open cards in one `GET /1/boards/{id}`, decides with the one-card rule, and then dispatches `card-em-andamento`, adds `Na fila` with a comment, or removes `Na fila`.
+4. **Memory.** The workflow's static data keeps the last 50 Trello action ids (a re-delivered webhook is ignored) and the dispatched cards still holding the slot. It is saved only by production executions. Two executions at the same moment can overwrite each other's memory; the agent's `concurrency` group on GitHub Actions makes a duplicate dispatch wait instead of running in parallel.
+
 ## Updating
 
 Images are pinned. To update one, change its tag in `infra/docker-compose.yml`, copy the file to the server, and run `docker compose pull <service> && docker compose up -d <service>`. Read the release notes first, especially for Evolution API.
