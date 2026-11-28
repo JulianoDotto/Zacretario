@@ -1,0 +1,273 @@
+{
+  "id": "wIV6j9sUDjeoeYyH",
+  "name": "Resumo do dia",
+  "description": "Monta o resumo da manhã de uma pessoa (agenda de hoje + TODOs em aberto) e devolve o texto. Não envia nada.",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "0ce927a4-dbf6-479d-93d1-882cb4da5d99",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "user_key",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "7955152f-ddbd-4788-9f25-2740768f1101",
+      "name": "Ler pessoa",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT name, timezone FROM users WHERE key = $1",
+        "options": {
+          "queryReplacement": "={{ $('When Executed by Another Workflow').item.json.user_key }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "5m9yHkKV7JeOd48c",
+          "name": "Postgres Zacretário"
+        }
+      }
+    },
+    {
+      "id": "35f51b49-8820-4c73-bcaa-9adefb5ce56e",
+      "name": "Ler TODOs",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COALESCE(json_agg(json_build_object('id', id, 'text', text) ORDER BY id), '[]'::json) AS todos FROM todos WHERE user_key = $1 AND NOT done",
+        "options": {
+          "queryReplacement": "={{ $('When Executed by Another Workflow').item.json.user_key }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "5m9yHkKV7JeOd48c",
+          "name": "Postgres Zacretário"
+        }
+      }
+    },
+    {
+      "id": "210cea0f-4a55-490e-9813-6870a9e6930a",
+      "name": "Listar agenda de hoje",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "EjM0rSdJ3ZA0IrEJ",
+          "cachedResultName": "Portão de agenda"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "user_key": "={{ $('When Executed by Another Workflow').item.json.user_key }}",
+            "operation": "list",
+            "start_date": "={{ $now.setZone($('Ler pessoa').item.json.timezone).toFormat('yyyy-MM-dd') }}",
+            "end_date": "={{ $now.setZone($('Ler pessoa').item.json.timezone).toFormat('yyyy-MM-dd') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "user_key",
+              "displayName": "user_key",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "operation",
+              "displayName": "operation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "start_date",
+              "displayName": "start_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "end_date",
+              "displayName": "end_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "6ac919c4-d4ed-4aa7-8757-170b2d4b5ecc",
+      "name": "Juntar",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "j1",
+              "name": "name",
+              "value": "={{ $('Ler pessoa').item.json.name }}",
+              "type": "string"
+            },
+            {
+              "id": "j2",
+              "name": "today",
+              "value": "={{ ['seg','ter','qua','qui','sex','sáb','dom'][$now.setZone($('Ler pessoa').item.json.timezone).weekday - 1] + ' ' + $now.setZone($('Ler pessoa').item.json.timezone).toFormat('dd/MM') }}",
+              "type": "string"
+            },
+            {
+              "id": "j3",
+              "name": "agenda",
+              "value": "={{ $json.result ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "j4",
+              "name": "todos",
+              "value": "={{ $('Ler TODOs').item.json.todos }}",
+              "type": "array"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "35ae486c-7602-4f91-907b-77c65a423001",
+      "name": "Montar resumo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// n8n Code node 'Montar resumo' (Resumo do dia) — mode: Run Once for Each Item.\n// Builds the morning WhatsApp summary.\n// Input $json: { name, today (like 'sex 28/11'), agenda (text from 'Portão de agenda', operation list),\n//   todos: [{ id, text }] }.\n// Output: { text }.\nconst { name, today } = $json;\nconst todos = ($json.todos || []).filter((t) => t && t.id !== undefined && t.id !== null);\nconst agenda = String($json.agenda ?? '').trim();\n\nconst agendaFailed = agenda === '' || agenda.startsWith('Erro');\nconst agendaEmpty = !agendaFailed && agenda.startsWith('Nenhum compromisso');\n\nconst header = `Bom dia, ${name}! Hoje é ${today}.`;\n\nif (agendaEmpty && todos.length === 0) {\n  return { json: { text: `${header} Sua agenda está livre e você não tem TODOs em aberto.` } };\n}\n\nconst blocks = [header];\n\nif (agendaFailed) {\n  blocks.push('Não consegui ler sua agenda agora.');\n} else if (agendaEmpty) {\n  blocks.push('📅 Agenda livre hoje.');\n} else {\n  // Each line is '[google-id] sex 28/11 09:00–10:00 Title': drop the id and the day.\n  const lines = agenda.split('\\n').map((line) =>\n    line\n      .replace(/^\\[[^\\]]*\\]\\s*/, '')\n      .replace(/^(seg|ter|qua|qui|sex|sáb|dom) \\d{2}\\/\\d{2}\\s*/, '')\n      .trim(),\n  );\n  blocks.push(['📅 Agenda de hoje:', ...lines.filter(Boolean).map((l) => `📅 ${l}`)].join('\\n'));\n}\n\nif (todos.length === 0) {\n  blocks.push('✅ Nenhum TODO em aberto.');\n} else {\n  blocks.push(['✅ TODOs em aberto:', ...todos.map((t) => `✅ ${t.id}. ${t.text}`)].join('\\n'));\n}\n\nreturn { json: { text: blocks.join('\\n\\n') } };\n"
+      }
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Ler pessoa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler pessoa": {
+      "main": [
+        [
+          {
+            "node": "Ler TODOs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler TODOs": {
+      "main": [
+        [
+          {
+            "node": "Listar agenda de hoje",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Listar agenda de hoje": {
+      "main": [
+        [
+          {
+            "node": "Juntar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Juntar": {
+      "main": [
+        [
+          {
+            "node": "Montar resumo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "nodeGroups": [],
+  "tags": []
+}

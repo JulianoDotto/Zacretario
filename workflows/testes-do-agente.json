@@ -452,9 +452,156 @@
         "respondWith": "firstIncomingItem",
         "options": {}
       }
+    },
+    {
+      "id": "a1b2c3d4-0001-4a00-8000-000000000001",
+      "name": "Resumo de teste",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        800
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "testes-agente-resumo",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "a1b2c3d4-0002-4a00-8000-000000000002",
+      "name": "Manual? (resumo)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        224,
+        800
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "m4",
+              "leftValue": "={{ $execution.mode }}",
+              "rightValue": "test",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a1b2c3d4-0003-4a00-8000-000000000003",
+      "name": "Chamar Resumo do dia",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        448,
+        800
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "wIV6j9sUDjeoeYyH",
+          "cachedResultName": "Resumo do dia",
+          "cachedResultUrl": "/workflow/wIV6j9sUDjeoeYyH"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "user_key": "teste"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "user_key",
+              "displayName": "user_key",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0004-4a00-8000-000000000004",
+      "name": "Resposta do resumo",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        672,
+        800
+      ],
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {}
+      }
     }
   ],
   "connections": {
+    "Resumo de teste": {
+      "main": [
+        [
+          {
+            "node": "Manual? (resumo)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual? (resumo)": {
+      "main": [
+        [
+          {
+            "node": "Chamar Resumo do dia",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Recusar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chamar Resumo do dia": {
+      "main": [
+        [
+          {
+            "node": "Resposta do resumo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Limpar dados do teste": {
       "main": [
         [
