@@ -193,6 +193,17 @@ The board and the agent are described in [kanban.md](kanban.md).
 
    The version is pinned on purpose: a new version of third-party code holding the token only comes in when you decide. Version `1.7.2` only talks to `api.trello.com` and Trello attachments, and its telemetry stays off unless `APPLICATIONINSIGHTS_CONNECTION_STRING` is set. Trello's official MCP (`https://mcp.trello.com/v1`) only accepts interactive OAuth, so it cannot run on GitHub Actions.
 
+## Trello listener (Kanban: card movido)
+
+The production n8n listens to the board and starts the agent. The workflow is [workflows/kanban-card-movido.json](../workflows/kanban-card-movido.json), in the **Kanban** folder; its Code nodes are `workflows/code/kanban-montar.js`, `kanban-decidir.js` and `kanban-registrar.js`, tested with `node --test workflows/code/tests/`.
+
+1. **Credentials** in production n8n, typed by you:
+   - **Trello API** (`Trello account`): the same API key and token as the Trello MCP.
+   - **GitHub API** (`GitHub account`): a fine-grained token for `JulianoDotto/Zacretario` only, with **Contents: Read and write** and nothing else. That is what `POST /repos/{owner}/{repo}/dispatches` requires. Give it an expiry and a calendar reminder: Contents write could also push to branches other than the protected `main`.
+2. **Import and publish** `workflows/kanban-card-movido.json`. Publishing registers a Trello webhook on the board; unpublishing removes it. The export has no `webhookId`, so n8n makes a new webhook URL on import.
+3. **What it does.** Every board event runs it; anything that is not a card changing lists (comments, labels, including its own) stops at the first Filter. It fetches the open cards in one `GET /1/boards/{id}`, decides with the one-card rule, and then dispatches `card-em-andamento`, adds `Na fila` with a comment, or removes `Na fila`.
+4. **Memory.** The workflow's static data keeps the last 50 Trello action ids (a re-delivered webhook is ignored) and the dispatched cards still holding the slot. It is saved only by production executions. Two executions at the same moment can overwrite each other's memory; the agent's `concurrency` group on GitHub Actions makes a duplicate dispatch wait instead of running in parallel.
+
 ## Updating
 
 Images are pinned. To update one, change its tag in `infra/docker-compose.yml`, copy the file to the server, and run `docker compose pull <service> && docker compose up -d <service>`. Read the release notes first, especially for Evolution API.
