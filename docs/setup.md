@@ -94,6 +94,7 @@ Evolution API is licensed under Apache 2.0 with extra conditions: keep its logo 
    ```bash
    docker compose exec -T postgres psql -U zacretario -d zacretario < sql/001_schema.sql
    docker compose exec -T postgres psql -U zacretario -d zacretario < sql/002_conversation.sql
+   docker compose exec -T postgres psql -U zacretario -d zacretario < sql/003_resumo_diario.sql
    ```
 
 2. In n8n, create the credential **Postgres Zacretário** (Postgres: host `postgres`, database and user `zacretario`, password `ZACRETARIO_DB_PASSWORD` from `infra/.env`, SSL disabled).
@@ -165,7 +166,7 @@ A second n8n, `n8n-teste`, runs on the same server for the Kanban agent ([docs/s
 
 1. **DNS.** An `A` record `teste` pointing to the server's IP. Caddy gets the certificate by itself on the first request, so the record must exist first.
 2. **Secrets.** In `/opt/zacretario/infra/.env`, add `N8N_TESTE_DB_PASSWORD`, `ZACRETARIO_TESTE_DB_PASSWORD` and `N8N_TESTE_ENCRYPTION_KEY`, each with a new `openssl rand -hex 32`, never the production values.
-3. **Databases.** `postgres/init.sh` only runs on an empty volume, so on a server that already runs create them by hand, with the same `CREATE ROLE` / `CREATE DATABASE` as the script (load `.env` first with `set -a; . ./.env; set +a`, and pass the password as `psql -v password="$N8N_TESTE_DB_PASSWORD"`). Then apply `sql/001_schema.sql` and `sql/002_conversation.sql` to `zacretario_teste` as the user `zacretario_teste`.
+3. **Databases.** `postgres/init.sh` only runs on an empty volume, so on a server that already runs create them by hand, with the same `CREATE ROLE` / `CREATE DATABASE` as the script (load `.env` first with `set -a; . ./.env; set +a`, and pass the password as `psql -v password="$N8N_TESTE_DB_PASSWORD"`). Then apply `sql/001_schema.sql`, `sql/002_conversation.sql` and `sql/003_resumo_diario.sql` to `zacretario_teste` as the user `zacretario_teste`.
 4. **Start.** `docker compose up -d n8n-teste`, then `docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile` (no downtime).
    Changing the `environment` of `postgres` (as adding the two passwords does) makes `up` recreate Postgres too: production loses its database connection for about ten seconds. Do it at a quiet hour.
 5. **Owner and MCP.** Open `https://teste.<domain>`, create the owner account (its own password), and turn on **Settings → Instance-level MCP**. To use it from Claude Code: `claude mcp add --transport http --scope user n8n-teste https://teste.<domain>/mcp-server/http`, then authenticate in `/mcp`.
