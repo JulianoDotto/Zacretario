@@ -40,7 +40,6 @@ Part: a new entry workflow.
 
 ## Housekeeping and concurrency
 
-- **Pruning old rows.** `processed_messages` and `conversation` only grow. A daily Schedule Trigger with one SQL statement could delete deduplication rows older than a few days and conversation rows older than 24 hours.
 - **Per-person ordering.** Two messages sent close together run as separate executions and can interleave (a "yes" racing the message it confirms). n8n's queue mode or a per-user lock row would serialise them. The same applies to an album of photos: each one is its own execution and its own question; grouping media that arrive together would give one answer.
 - **Timed event back to all-day.** `update_event` can turn an all-day event into a timed one, but not the reverse; it needs an `all_day` input on the tool and a branch in the `Decidir` Code node.
 

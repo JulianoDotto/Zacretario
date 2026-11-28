@@ -1,0 +1,74 @@
+{
+  "id": "AGDbc6Rj3aaLog0c",
+  "name": "Limpeza diária",
+  "description": "Todo dia às 04:00 apaga a conversa com mais de 48 h e os IDs de mensagem com mais de 7 dias, e devolve quantas linhas apagou de cada tabela.",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 4,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "7921454e-713e-4783-b61a-677ee895b781",
+      "name": "Todo dia às 04:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH c AS (DELETE FROM conversation WHERE created_at < now() - interval '48 hours' RETURNING 1), p AS (DELETE FROM processed_messages WHERE received_at < now() - interval '7 days' RETURNING 1) SELECT (SELECT count(*) FROM c) AS conversa, (SELECT count(*) FROM p) AS mensagens;",
+        "options": {}
+      },
+      "id": "8ee14330-6742-49b1-a403-5a574bb4269d",
+      "name": "Apagar linhas antigas",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.8,
+      "position": [
+        320,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "5m9yHkKV7JeOd48c",
+          "name": "Postgres Zacretário"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Todo dia às 04:00": {
+      "main": [
+        [
+          {
+            "node": "Apagar linhas antigas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "errorWorkflow": "93khVPDggzbYIxrs",
+    "timezone": "America/Sao_Paulo",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "nodeGroups": [],
+  "tags": []
+}
